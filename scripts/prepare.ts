@@ -8,7 +8,7 @@ import { systemCoreOnlyBuild } from './build-env.ts'
 const cwd = process.cwd()
 const TEMP_DIR = path.join(cwd, 'node_modules/.temp')
 let arch: string = process.arch
-const platform = process.platform
+const platform = process.env.TARGET_PLATFORM || process.platform
 if (process.argv.slice(2).length !== 0) {
   arch = process.argv.slice(2)[0].replace('--', '')
 }
