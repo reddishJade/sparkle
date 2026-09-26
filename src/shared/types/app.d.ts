@@ -65,6 +65,7 @@ interface AppConfig {
   disableTray?: boolean
   showFloatingWindow?: boolean
   connectionCardStatus?: CardStatus
+  trafficCardStatus?: CardStatus
   dnsCardStatus?: CardStatus
   logCardStatus?: CardStatus
   pauseSSID?: string[]

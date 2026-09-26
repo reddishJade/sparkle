@@ -97,6 +97,7 @@ interface ControllerConnectionDetail {
   download: number
   start: string
   chains: string[]
+  providerChains?: string[]
   rule: string
   rulePayload: string
 
