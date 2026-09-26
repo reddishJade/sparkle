@@ -136,6 +136,10 @@ export function serviceAuthStorePath(): string {
   return path.join(dataDir(), 'service-auth.json')
 }
 
+export function trafficStatsPath(): string {
+  return path.join(dataDir(), 'traffic-stats.json')
+}
+
 export function appConfigPath(): string {
   return path.join(dataDir(), 'config.yaml')
 }

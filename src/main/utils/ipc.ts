@@ -139,6 +139,7 @@ import { showNotification } from './notification'
 import { getUserAgent } from './userAgent'
 import { appendAppLog, clearCachedMihomoLogs, getCachedMihomoLogs } from './log'
 import { ageIdentityToRecipient, generateAgeKeyPair } from './age'
+import { trafficStatsService } from '../traffic/traffic-stats-service'
 
 function ipcErrorWrapper<T>( // eslint-disable-next-line @typescript-eslint/no-explicit-any
   fn: (...args: any[]) => T | Promise<T> // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -438,4 +439,10 @@ export function registerIpcMainHandlers(): void {
     setNotQuitDialog()
     app.quit()
   })
+  ipcMain.handle('getTrafficStats', (_e, range) =>
+    ipcErrorWrapper(() => trafficStatsService.getSummary(range))()
+  )
+  ipcMain.handle('clearTrafficStats', () =>
+    ipcErrorWrapper(() => trafficStatsService.clear())()
+  )
 }

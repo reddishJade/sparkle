@@ -27,6 +27,7 @@ import {
 import { shouldSkipServiceUnavailableFallback } from '../service/fallback'
 import { appendAppLog, setMihomoLogSource } from '../utils/log'
 import { showNotification } from '../utils/notification'
+import { trafficStatsService } from '../traffic/traffic-stats-service'
 
 interface ServiceCoreRuntimeOptions {
   notifyCoreLog: (source: ServiceCoreEvent) => void
@@ -239,6 +240,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
       case 'started':
         serviceCoreState.autoResumePaused = false
         serviceCoreState.managed = true
+        trafficStatsService.setCoreInstanceId(`service_${event.pid || 'core'}_${event.time || Date.now()}`)
         await getAxios(true).catch(() => {})
         mainWindow?.webContents.send('core-started', event)
         mainWindow?.webContents.send('groupsUpdated')
@@ -252,6 +254,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
       case 'ready':
         serviceCoreState.autoResumePaused = false
         serviceCoreState.managed = true
+        trafficStatsService.setCoreInstanceId(`service_${event.pid || 'core'}_${event.time || Date.now()}`)
         await getAxios(true).catch(() => {})
         mainWindow?.webContents.send('core-started', event)
         mainWindow?.webContents.send('groupsUpdated')
@@ -262,6 +265,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
       case 'exited':
       case 'failed':
       case 'restart_failed':
+        trafficStatsService.setCoreInstanceId(undefined)
         clearStreams()
         setMihomoLogSource('out')
         mainWindow?.webContents.send('core-stopped', event)
@@ -273,6 +277,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
         }
         break
       case 'stopped':
+        trafficStatsService.setCoreInstanceId(undefined)
         serviceCoreState.autoResumePaused = true
         serviceCoreState.managed = false
         serviceCoreState.streamsActive = false

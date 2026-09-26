@@ -23,6 +23,7 @@ import {
 import { readFile, rm, writeFile } from 'fs/promises'
 import { mainWindow } from '..'
 import path from 'path'
+import { trafficStatsService } from '../traffic/traffic-stats-service'
 import os from 'os'
 import { existsSync } from 'fs'
 import { uploadRuntimeConfig } from '../resolve/gistApi'
@@ -497,6 +498,7 @@ export async function startCore(detached = false): Promise<Promise<void>[]> {
   }
   hookWaiter?.attachProcess(child)
   if (child.pid) {
+    trafficStatsService.setCoreInstanceId(`direct_${child.pid}_${Date.now()}`)
     try {
       os.setPriority(child.pid, os.constants.priority[mihomoCpuPriority])
     } catch (error) {

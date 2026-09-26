@@ -3,6 +3,7 @@ import { stopCore } from '../core/manager'
 import { stopNetworkDetection } from '../core/network'
 import { disableSysProxySync, triggerSysProxy } from '../sys/sysproxy'
 import { appendAppLog } from '../utils/log'
+import { trafficStatsService } from '../traffic/traffic-stats-service'
 
 interface AppQuitLifecycleContext {
   getMainWindow: () => BrowserWindow | null
@@ -51,6 +52,7 @@ export function initAppQuitLifecycle(context: AppQuitLifecycleContext): void {
   })
 
   app.on('will-quit', () => {
+    trafficStatsService.flushSync()
     disableSysProxySync()
   })
 }
@@ -82,6 +84,13 @@ async function cleanupBeforeExit(useRegistry: boolean): Promise<void> {
         await stopCore()
       } catch (error) {
         await appendAppLog(`[App]: stop core before exit failed, ${error}\n`)
+      }
+    })(),
+    (async (): Promise<void> => {
+      try {
+        await trafficStatsService.flush()
+      } catch (error) {
+        await appendAppLog(`[App]: flush traffic stats before exit failed, ${error}\n`)
       }
     })()
   ])
