@@ -838,5 +838,132 @@ describe('TrafficStatsEngine', () => {
     assert.equal(groupMain.upload, 100)
     assert.equal(groupMain.download, 200)
   })
+
+  // 20. 本次运行（session）统计：独立于磁盘历史、支持跨日持续累积、可被 clear 重置
+  it('20. 本次运行（session）统计：独立于磁盘历史、支持跨日持续累积、可被 clear 重置', () => {
+    const todayStr = formatLocalDate(baseTime)
+    // 假设磁盘中已有历史流量（今天早些时候产生的 500/1000 流量）
+    const initialData = {
+      checkpoint: {
+        lastCoreUploadTotal: 0,
+        lastCoreDownloadTotal: 0,
+        lastTimestamp: 0
+      },
+      days: {
+        [todayStr]: {
+          day: todayStr,
+          uploadTotal: 500,
+          downloadTotal: 1000,
+          attributedUpload: 500,
+          attributedDownload: 1000,
+          rawGlobalUpload: 500,
+          rawGlobalDownload: 1000,
+          unknownUpload: 0,
+          unknownDownload: 0,
+          records: {
+            'OldNode:::OldGroup:::OldNode>OldGroup': {
+              node: 'OldNode',
+              group: 'OldGroup',
+              chains: ['OldNode', 'OldGroup'],
+              upload: 500,
+              download: 1000
+            }
+          }
+        }
+      }
+    }
+
+    const engine = new TrafficStatsEngine(initialData)
+
+    // 1. 启动建立基准
+    engine.feedSnapshot({ uploadTotal: 100, downloadTotal: 200, connections: [] }, baseTime)
+
+    // 本次运行此时应该为 0
+    let sessionSummary = engine.getSummary('session', baseTime)
+    assert.equal(sessionSummary.total, 0)
+    assert.equal(sessionSummary.nodes.length, 0)
+
+    // 今日统计此时应包含历史的 1500 (500+1000)
+    const todaySummary = engine.getSummary('today', baseTime)
+    assert.equal(todaySummary.total, 1500)
+    assert.equal(todaySummary.nodes.length, 1)
+    assert.equal(todaySummary.nodes[0].name, 'OldNode')
+
+    // 2. 本次运行中产生流量（NodeA 上传 20，下载 40）
+    engine.feedSnapshot(
+      {
+        uploadTotal: 120,
+        downloadTotal: 240,
+        connections: [
+          {
+            id: 'c1',
+            upload: 20,
+            download: 40,
+            chains: ['NodeA', 'GroupA']
+          } as any
+        ]
+      },
+      baseTime + 1000
+    )
+
+    sessionSummary = engine.getSummary('session', baseTime + 1000)
+    assert.equal(sessionSummary.totalUpload, 20)
+    assert.equal(sessionSummary.totalDownload, 40)
+    assert.equal(sessionSummary.total, 60)
+    assert.equal(sessionSummary.nodes.length, 1)
+    assert.equal(sessionSummary.nodes[0].name, 'NodeA')
+    assert.equal(sessionSummary.nodes[0].upload, 20)
+    assert.equal(sessionSummary.nodes[0].download, 40)
+
+    // 3. 模拟跨日：运行持续到第二天 (baseTime + 24小时)
+    const nextDayTime = baseTime + 24 * 60 * 60 * 1000 + 5000
+    engine.feedSnapshot(
+      {
+        uploadTotal: 150,
+        downloadTotal: 300,
+        connections: [
+          {
+            id: 'c1',
+            upload: 20,
+            download: 40,
+            chains: ['NodeA', 'GroupA']
+          } as any,
+          {
+            id: 'c2',
+            upload: 30,
+            download: 60,
+            chains: ['NodeB', 'GroupB']
+          } as any
+        ]
+      },
+      nextDayTime
+    )
+
+    // 第二天的今日统计仅包含 NodeB (30/60)
+    const nextDaySummary = engine.getSummary('today', nextDayTime)
+    assert.equal(nextDaySummary.totalUpload, 30)
+    assert.equal(nextDaySummary.totalDownload, 60)
+    assert.equal(nextDaySummary.nodes.length, 1)
+    assert.equal(nextDaySummary.nodes[0].name, 'NodeB')
+
+    // 但本次运行统计持续包含 NodeA (20/40) + NodeB (30/60) = 50 / 100 = 150
+    sessionSummary = engine.getSummary('session', nextDayTime)
+    assert.equal(sessionSummary.totalUpload, 50)
+    assert.equal(sessionSummary.totalDownload, 100)
+    assert.equal(sessionSummary.total, 150)
+    assert.equal(sessionSummary.nodes.length, 2)
+    const nodeA = sessionSummary.nodes.find((n) => n.name === 'NodeA')!
+    const nodeB = sessionSummary.nodes.find((n) => n.name === 'NodeB')!
+    assert.equal(nodeA.upload, 20)
+    assert.equal(nodeA.download, 40)
+    assert.equal(nodeB.upload, 30)
+    assert.equal(nodeB.download, 60)
+
+    // 4. 清空统计：本次运行也被清空为 0
+    engine.clear(nextDayTime)
+    sessionSummary = engine.getSummary('session', nextDayTime)
+    assert.equal(sessionSummary.total, 0)
+    assert.equal(sessionSummary.nodes.length, 0)
+  })
 })
 

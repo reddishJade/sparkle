@@ -46,7 +46,7 @@ export interface TrafficSummaryItem {
   total: number
 }
 
-export type TrafficTimeRange = 'today' | '7d' | '30d' | 'all'
+export type TrafficTimeRange = 'session' | 'today' | '7d' | '30d' | 'all'
 
 export interface TrafficStatsSummary {
   range: TrafficTimeRange

@@ -39,6 +39,18 @@ interface ActiveConnectionState {
 
 export class TrafficStatsEngine {
   private data: TrafficStatsStorage
+  private sessionStats: DayTrafficStats = {
+    day: 'session',
+    uploadTotal: 0,
+    downloadTotal: 0,
+    attributedUpload: 0,
+    attributedDownload: 0,
+    rawGlobalUpload: 0,
+    rawGlobalDownload: 0,
+    unknownUpload: 0,
+    unknownDownload: 0,
+    records: {}
+  }
   private activeConns = new Map<string, ActiveConnectionState>()
   private lastGlobalUp: number | null = null
   private lastGlobalDown: number | null = null
@@ -348,6 +360,20 @@ export class TrafficStatsEngine {
         }
         record.upload += connUpDelta
         record.download += connDownDelta
+
+        let sessionRecord = this.sessionStats.records[recordKey]
+        if (!sessionRecord) {
+          sessionRecord = {
+            node,
+            group,
+            chains,
+            upload: 0,
+            download: 0
+          }
+          this.sessionStats.records[recordKey] = sessionRecord
+        }
+        sessionRecord.upload += connUpDelta
+        sessionRecord.download += connDownDelta
         this.dirty = true
       }
     }
@@ -377,6 +403,13 @@ export class TrafficStatsEngine {
     //    当下期连接增量爆发追上来时，优先从 Unknown 抵扣转移至 Node，彻底消除时差造成的双计！
     this.recalculateTotals(dayStats)
 
+    // 同步更新 sessionStats 闭环对账
+    this.sessionStats.attributedUpload += sumConnUpDelta
+    this.sessionStats.attributedDownload += sumConnDownDelta
+    this.sessionStats.rawGlobalUpload += globalUpDelta
+    this.sessionStats.rawGlobalDownload += globalDownDelta
+    this.recalculateTotals(this.sessionStats)
+
     this.lastGlobalUp = snapshot.uploadTotal
     this.lastGlobalDown = snapshot.downloadTotal
     this.data.checkpoint = {
@@ -389,7 +422,19 @@ export class TrafficStatsEngine {
   }
 
   public getSummary(range: TrafficTimeRange = 'today', now: number = Date.now()): TrafficStatsSummary {
-    const targetDays = this.getTargetDays(range, now)
+    const statsList: DayTrafficStats[] = []
+    if (range === 'session') {
+      statsList.push(this.sessionStats)
+    } else {
+      const targetDays = this.getTargetDays(range, now)
+      for (const dayStr of targetDays) {
+        const dayStats = this.data.days[dayStr]
+        if (dayStats) {
+          this.ensureDayStatsStructure(dayStats)
+          statsList.push(dayStats)
+        }
+      }
+    }
 
     let unknownUpload = 0
     let unknownDownload = 0
@@ -397,11 +442,7 @@ export class TrafficStatsEngine {
     const nodeMap = new Map<string, { upload: number; download: number }>()
     const groupMap = new Map<string, { upload: number; download: number }>()
 
-    for (const dayStr of targetDays) {
-      const dayStats = this.data.days[dayStr]
-      if (!dayStats) continue
-
-      this.ensureDayStatsStructure(dayStats)
+    for (const dayStats of statsList) {
       unknownUpload += dayStats.unknownUpload
       unknownDownload += dayStats.unknownDownload
 
@@ -473,7 +514,7 @@ export class TrafficStatsEngine {
     }
   }
 
-  private getTargetDays(range: TrafficTimeRange, now: number): string[] {
+  private getTargetDays(range: Exclude<TrafficTimeRange, 'session'>, now: number): string[] {
     const todayStr = formatLocalDate(now)
     if (range === 'today') {
       return [todayStr]
@@ -496,6 +537,18 @@ export class TrafficStatsEngine {
 
   public clear(now: number = Date.now()): void {
     this.data.days = {}
+    this.sessionStats = {
+      day: 'session',
+      uploadTotal: 0,
+      downloadTotal: 0,
+      attributedUpload: 0,
+      attributedDownload: 0,
+      rawGlobalUpload: 0,
+      rawGlobalDownload: 0,
+      unknownUpload: 0,
+      unknownDownload: 0,
+      records: {}
+    }
     this.data.checkpoint = {
       coreInstanceId: this.currentCoreInstanceId,
       lastCoreUploadTotal: this.lastGlobalUp ?? 0,

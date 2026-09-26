@@ -258,6 +258,10 @@ const TrafficPage: React.FC = () => {
               </Select.Trigger>
               <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
                 <ListBox>
+                  <ListBox.Item key="session" id="session" textValue="本次运行">
+                    本次运行
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
                   <ListBox.Item key="today" id="today" textValue="今日">
                     今日
                     <ListBox.ItemIndicator />
