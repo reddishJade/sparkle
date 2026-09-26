@@ -23,7 +23,8 @@ import { cropAndPadTransparent } from '@renderer/utils/image'
 import { platform } from '@renderer/utils/init'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import { MdTune } from 'react-icons/md'
-import { IoPause, IoPlay } from 'react-icons/io5'
+import { IoPause, IoPlay, IoStatsChart } from 'react-icons/io5'
+import { useNavigate } from 'react-router-dom'
 import { compileAdvancedFilter } from '@renderer/utils/advanced-filter'
 import {
   ConnectionFilterCompletionSession,
@@ -35,6 +36,7 @@ import {
 let cachedConnections: ControllerConnectionDetail[] = []
 
 const Connections: React.FC = () => {
+  const navigate = useNavigate()
   const { controledMihomoConfig } = useControledMihomoConfig()
   const { 'find-process-mode': findProcessMode = 'always' } = controledMihomoConfig || {}
   const [filter, setFilter] = useState('')
@@ -943,6 +945,20 @@ const Connections: React.FC = () => {
           >
             <MdTune className="text-lg" />
           </Button>
+          <Tooltip delay={0}>
+            <Button
+              size="sm"
+              isIconOnly
+              aria-label="流量统计"
+              onPress={() => navigate('/traffic')}
+              variant="ghost"
+              data-color="default"
+              className="app-nodrag"
+            >
+              <IoStatsChart className="text-lg" />
+            </Button>
+            <Tooltip.Content placement="bottom">流量统计</Tooltip.Content>
+          </Tooltip>
         </>
       }
     >

@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { markInitialContentPartReady } from '@renderer/utils/startup'
 import {
   Connections,
+  Traffic,
   DNS,
   Logs,
   Mihomo,
@@ -71,6 +72,10 @@ const routes = [
   {
     path: '/connections',
     element: startupRoute(<Connections />)
+  },
+  {
+    path: '/traffic',
+    element: startupRoute(<Traffic />)
   },
   {
     path: '/override',

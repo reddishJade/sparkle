@@ -1,4 +1,5 @@
 import { TitleBarOverlayOptions } from 'electron'
+import type { TrafficStatsSummary, TrafficTimeRange } from '../../../shared/types/traffic'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function ipcErrorWrapper(response: any): any {
@@ -638,6 +639,16 @@ export async function copyEnv(
   type: 'bash' | 'fish' | 'cmd' | 'powershell' | 'nushell'
 ): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('copyEnv', type))
+}
+
+export async function getTrafficStats(
+  range: TrafficTimeRange = 'today'
+): Promise<TrafficStatsSummary> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getTrafficStats', range))
+}
+
+export async function clearTrafficStats(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('clearTrafficStats'))
 }
 
 async function alert<T>(msg: T): Promise<void> {

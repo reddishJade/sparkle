@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import {
   closestCenter,
   DndContext,
@@ -22,6 +22,7 @@ import ResourceCard from './resource-card'
 import RuleCard from './rule-card'
 import SniffCard from './sniff-card'
 import SubStoreCard from './substore-card'
+import TrafficCard from './traffic-card'
 import SysproxySwitcher from './sysproxy-switcher'
 import TunSwitcher from './tun-switcher'
 import { siderSortingStrategy } from './sider-sorting'
@@ -48,6 +49,7 @@ const defaultSiderOrder = [
   'sniff',
   'proxy',
   'connection',
+  'traffic',
   'profile',
   'mihomo',
   'rule',
@@ -64,6 +66,7 @@ const siderCardRouteMap = {
   'proxy-card': '/proxies',
   'mihomo-core-card': '/mihomo',
   'conn-card': '/connections',
+  'traffic-card': '/traffic',
   'dns-card': '/dns',
   'sniff-card': '/sniffer',
   'log-card': '/logs',
@@ -84,6 +87,7 @@ const componentMap = {
   proxy: ProxyCard,
   mihomo: MihomoCoreCard,
   connection: ConnCard,
+  traffic: TrafficCard,
   dns: DNSCard,
   sniff: SniffCard,
   log: LogCard,
@@ -99,7 +103,11 @@ interface Props {
 
 export default function SiderCards({ iconOnly = false }: Props): React.JSX.Element {
   const { appConfig, patchAppConfig } = useAppConfig()
-  const siderOrder = appConfig?.siderOrder ?? defaultSiderOrder
+  const siderOrder = useMemo(() => {
+    const raw = appConfig?.siderOrder ?? defaultSiderOrder
+    const missing = defaultSiderOrder.filter((id) => !raw.includes(id))
+    return missing.length > 0 ? [...raw, ...missing] : raw
+  }, [appConfig?.siderOrder])
   const [order, setOrder] = useState(siderOrder)
   const gridRef = useRef<HTMLDivElement>(null)
   const suppressClickRef = useRef(false)
