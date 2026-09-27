@@ -1,13 +1,13 @@
 {
   "name": "sparkle",
-  "version": "1.26.8",
+  "version": "1.26.9",
   "description": "Sparkle",
   "main": "./out/main/index.js",
   "author": {
     "name": "xishang0128",
     "email": "xishang02@gmail.com"
   },
-  "homepage": "https://github.com/xishang0128/sparkle",
+  "homepage": "https://github.com/reddishJade/sparkle",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
