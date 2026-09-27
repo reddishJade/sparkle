@@ -23,7 +23,8 @@ const ConnectionSettingDrawer: React.FC<Props> = (props) => {
     connectionInterval = 500,
     connectionGroupByProcess = false,
     connectionGroupSort = 'name',
-    connectionGroupDirection = 'asc'
+    connectionGroupDirection = 'asc',
+    connectionPauseOnHover = false
   } = appConfig || {}
   const [intervalInput, setIntervalInput] = useState(connectionInterval)
   const [isOpen, setIsOpen] = useState(true)
@@ -94,6 +95,33 @@ const ConnectionSettingDrawer: React.FC<Props> = (props) => {
                   isSelected={displayAppName}
                   onChange={(v) => {
                     patchAppConfig({ displayAppName: v })
+                  }}
+                >
+                  <Switch.Content>
+                    <Switch.Control>
+                      <Switch.Thumb />
+                    </Switch.Control>
+                  </Switch.Content>
+                </Switch>
+              </SettingItem>
+              <SettingItem
+                title={
+                  <div className="flex flex-col">
+                    <span>悬停时暂停刷新</span>
+                    <span className="text-xs text-foreground-400 font-normal">
+                      鼠标移入连接列表时自动暂停刷新，避免列表跳动
+                    </span>
+                  </div>
+                }
+                {...settingItemProps}
+                divider
+              >
+                <Switch
+                  size="sm"
+                  aria-label="悬停时暂停刷新"
+                  isSelected={connectionPauseOnHover}
+                  onChange={(v) => {
+                    patchAppConfig({ connectionPauseOnHover: v })
                   }}
                 >
                   <Switch.Content>

@@ -49,7 +49,8 @@ const Connections: React.FC = () => {
     displayAppName = true,
     connectionGroupByProcess = false,
     connectionGroupSort = 'name',
-    connectionGroupDirection = 'asc'
+    connectionGroupDirection = 'asc',
+    connectionPauseOnHover = false
   } = appConfig || {}
   const [connectionsInfo, setConnectionsInfo] = useState<ControllerConnections>()
   const [allConnections, setAllConnections] =
@@ -66,8 +67,14 @@ const Connections: React.FC = () => {
   const [firstItemRefreshTrigger, setFirstItemRefreshTrigger] = useState(0)
 
   const [tab, setTab] = useState('active')
-  const [paused, setPaused] = useState(false)
-  const pausedRef = useRef(paused)
+  const [isManualPaused, setIsManualPaused] = useState(false)
+  const [isCtrlHeld, setIsCtrlHeld] = useState(false)
+  const isCtrlHeldRef = useRef(false)
+  const [isHoverPaused, setIsHoverPaused] = useState(false)
+
+  const isEffectivePaused = isManualPaused || isCtrlHeld || isHoverPaused || isDetailModalOpen
+  const pausedRef = useRef(isEffectivePaused)
+  pausedRef.current = isEffectivePaused
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [expandedContent, setExpandedContent] = useState<Set<string>>(new Set())
@@ -90,6 +97,61 @@ const Connections: React.FC = () => {
 
   const lastActiveTime = useRef<Map<string, number>>(new Map())
   const [isFilterFocused, setIsFilterFocused] = useState(false)
+
+  useEffect(() => {
+    const handleKeyDown = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        if (!isCtrlHeldRef.current) {
+          isCtrlHeldRef.current = true
+          setIsCtrlHeld(true)
+        }
+        return
+      }
+
+      if (
+        e.code === 'Space' &&
+        !isFilterFocused &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA'
+      ) {
+        e.preventDefault()
+        setIsManualPaused((prev) => !prev)
+      }
+    }
+
+    const handleKeyUp = (e: globalThis.KeyboardEvent): void => {
+      if (e.key === 'Control' || e.key === 'Meta') {
+        if (isCtrlHeldRef.current) {
+          isCtrlHeldRef.current = false
+          setIsCtrlHeld(false)
+        }
+      }
+    }
+
+    const handleBlur = (): void => {
+      if (isCtrlHeldRef.current) {
+        isCtrlHeldRef.current = false
+        setIsCtrlHeld(false)
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('blur', handleBlur)
+
+    return (): void => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('blur', handleBlur)
+    }
+  }, [isFilterFocused])
+
+  useEffect(() => {
+    if (!connectionPauseOnHover && isHoverPaused) {
+      setIsHoverPaused(false)
+    }
+  }, [connectionPauseOnHover, isHoverPaused])
+
   const [filterCursor, setFilterCursor] = useState(0)
   const [filterScrollLeft, setFilterScrollLeft] = useState(0)
   const [completionSession, setCompletionSession] =
@@ -265,7 +327,12 @@ const Connections: React.FC = () => {
 
   const closeConnection = useCallback(
     (id: string): void => {
-      tab === 'active' ? mihomoCloseConnection(id) : trashClosedConnection(id)
+      const isLive = activeConnectionsRef.current.some((c) => c.id === id && c.isActive)
+      if (tab === 'active' && isLive) {
+        mihomoCloseConnection(id)
+      } else {
+        trashClosedConnection(id)
+      }
     },
     [tab, trashClosedConnection]
   )
@@ -307,9 +374,10 @@ const Connections: React.FC = () => {
     group.connections.forEach((conn) => close(conn.id))
   }, [])
 
-  useEffect(() => {
-    const handleConnections = (_e: unknown, info: ControllerConnections): void => {
-      if (pausedRef.current) return
+  const latestInfoRef = useRef<ControllerConnections | null>(null)
+
+  const processConnections = useCallback(
+    (info: ControllerConnections): void => {
       setConnectionsInfo(info)
 
       if (!info.connections) return
@@ -325,13 +393,16 @@ const Connections: React.FC = () => {
         lastActiveTime.current.set(id, now)
       })
 
+      // 3 秒缓冲期：避免短连接瞬间关闭并在 500ms 内直接从列表中消失导致错位或无法点击
+      const CLOSED_GRACE_PERIOD_MS = 3000
+
       lastActiveTime.current.forEach((activeAt, id) => {
-        if (now - activeAt >= 1000) {
+        if (now - activeAt >= CLOSED_GRACE_PERIOD_MS) {
           lastActiveTime.current.delete(id)
         }
       })
 
-      const activeConns = info.connections.map((conn) => {
+      const liveConns = info.connections.map((conn) => {
         const preConn = prevActiveMap.get(conn.id)
         const downloadSpeed = preConn
           ? Math.max(0, Math.round((conn.download - preConn.download) * speedRatio))
@@ -353,46 +424,66 @@ const Connections: React.FC = () => {
         }
       })
 
-      const newConnections = activeConns.filter(
+      // 保留最近关闭的连接在活动列表中短暂停留，标记为 isActive: false，避免用户点击时突然跳动消失
+      const recentlyClosedConns: ControllerConnectionDetail[] = []
+      prevActiveMap.forEach((prevConn, id) => {
+        if (!activeConnIds.has(id) && !deletedIdsRef.current.has(id)) {
+          const lastActive = lastActiveTime.current.get(id) || 0
+          if (now - lastActive < CLOSED_GRACE_PERIOD_MS) {
+            recentlyClosedConns.push({
+              ...prevConn,
+              isActive: false,
+              downloadSpeed: 0,
+              uploadSpeed: 0
+            })
+          }
+        }
+      })
+
+      const displayedActiveConns = [...liveConns, ...recentlyClosedConns]
+
+      const newConnections = liveConns.filter(
         (conn) => !existingConnectionIds.has(conn.id) && !deletedIdsRef.current.has(conn.id)
       )
 
-      const activeConnsMap = new Map(activeConns.map((ac) => [ac.id, ac]))
+      const liveConnsMap = new Map(liveConns.map((ac) => [ac.id, ac]))
 
-      if (newConnections.length > 0) {
-        const updatedAllConnections = [...allConnectionsRef.current, ...newConnections]
+      const updatedAllConnections =
+        newConnections.length > 0
+          ? [...allConnectionsRef.current, ...newConnections]
+          : allConnectionsRef.current
 
-        const allConns = updatedAllConnections.map((conn) => {
-          const activeConn = activeConnsMap.get(conn.id)
-          if (activeConn) return activeConn
-          const lastActive = lastActiveTime.current.get(conn.id) || 0
-          const isStillActive = now - lastActive < 1000
-          return { ...conn, isActive: isStillActive, downloadSpeed: 0, uploadSpeed: 0 }
-        })
+      const allConns = updatedAllConnections.map((conn) => {
+        const activeConn = liveConnsMap.get(conn.id)
+        if (activeConn) return activeConn
+        return { ...conn, isActive: false, downloadSpeed: 0, uploadSpeed: 0 }
+      })
 
-        const closedConns = allConns.filter((conn) => !conn.isActive)
+      const closedConns = allConns.filter(
+        (conn) => !activeConnIds.has(conn.id) && !deletedIdsRef.current.has(conn.id)
+      )
 
-        setActiveConnections(activeConns)
-        setClosedConnections(closedConns)
-        const finalAllConnections = allConns.slice(-(activeConns.length + 200))
-        setAllConnections(finalAllConnections)
-        cachedConnections = finalAllConnections
-      } else {
-        const allConns = allConnectionsRef.current.map((conn) => {
-          const activeConn = activeConnsMap.get(conn.id)
-          if (activeConn) return activeConn
-          const lastActive = lastActiveTime.current.get(conn.id) || 0
-          const isStillActive = now - lastActive < 1000
-          return { ...conn, isActive: isStillActive, downloadSpeed: 0, uploadSpeed: 0 }
-        })
+      setActiveConnections(displayedActiveConns)
+      setClosedConnections(closedConns)
 
-        const closedConns = allConns.filter((conn) => !conn.isActive)
+      const finalAllConnections =
+        newConnections.length > 0
+          ? allConns.slice(-(liveConns.length + 200))
+          : allConns
+      setAllConnections(finalAllConnections)
+      cachedConnections = finalAllConnections
+    },
+    [connectionInterval]
+  )
 
-        setActiveConnections(activeConns)
-        setClosedConnections(closedConns)
-        setAllConnections(allConns)
-        cachedConnections = allConns
-      }
+  const processConnectionsRef = useRef(processConnections)
+  processConnectionsRef.current = processConnections
+
+  useEffect(() => {
+    const handleConnections = (_e: unknown, info: ControllerConnections): void => {
+      latestInfoRef.current = info
+      if (pausedRef.current) return
+      processConnectionsRef.current(info)
     }
 
     window.electron.ipcRenderer.on('mihomoConnections', handleConnections)
@@ -400,11 +491,18 @@ const Connections: React.FC = () => {
     return (): void => {
       window.electron.ipcRenderer.removeAllListeners('mihomoConnections')
     }
-  }, [connectionInterval])
+  }, [])
 
+  // 当从暂停状态恢复为运行状态时，立刻应用最新缓存的快照，无延迟感知
+  const prevEffectivePausedRef = useRef(isEffectivePaused)
   useEffect(() => {
-    pausedRef.current = paused
-  }, [paused])
+    if (prevEffectivePausedRef.current && !isEffectivePaused) {
+      if (latestInfoRef.current) {
+        processConnectionsRef.current(latestInfoRef.current)
+      }
+    }
+    prevEffectivePausedRef.current = isEffectivePaused
+  }, [isEffectivePaused])
 
   const processAppNameQueue = useCallback(async () => {
     if (processingAppNames.current.size >= 3 || appNameRequestQueue.current.size === 0) return
@@ -915,22 +1013,28 @@ const Connections: React.FC = () => {
               </Badge>
             </Badge.Anchor>
           </div>
-          <Button
-            size="sm"
-            isIconOnly
-            aria-label={paused ? '继续' : '暂停'}
-            onPress={() =>
-              setPaused((p) => {
-                pausedRef.current = !p
-                return !p
-              })
-            }
-            variant="ghost"
-            data-color="default"
-            className="app-nodrag ml-2"
-          >
-            {paused ? <IoPlay className="text-lg" /> : <IoPause className="text-lg" />}
-          </Button>
+          <Tooltip delay={0}>
+            <Button
+              size="sm"
+              isIconOnly
+              aria-label={isEffectivePaused ? '继续刷新' : '暂停刷新'}
+              onPress={() => setIsManualPaused((p) => !p)}
+              variant={isEffectivePaused ? 'primary' : 'ghost'}
+              data-color={isEffectivePaused ? 'warning' : 'default'}
+              className="app-nodrag ml-2"
+            >
+              {isEffectivePaused ? (
+                <IoPlay className="text-lg" />
+              ) : (
+                <IoPause className="text-lg" />
+              )}
+            </Button>
+            <Tooltip.Content placement="bottom">
+              {isEffectivePaused
+                ? '继续刷新 (快捷键: 空格键 / 松开 Ctrl)'
+                : '暂停刷新 (快捷键: 空格键 / 按住 Ctrl 临时暂停)'}
+            </Tooltip.Content>
+          </Tooltip>
           <Button
             size="sm"
             isIconOnly
@@ -1157,7 +1261,34 @@ const Connections: React.FC = () => {
         </div>
         <Separator />
       </div>
-      <div className="h-[calc(100vh-100px)] mt-px">
+      <div
+        className="h-[calc(100vh-100px)] mt-px relative"
+        onMouseEnter={() => {
+          if (connectionPauseOnHover) {
+            setIsHoverPaused(true)
+          }
+        }}
+        onMouseLeave={() => {
+          if (connectionPauseOnHover) {
+            setIsHoverPaused(false)
+          }
+        }}
+      >
+        {isEffectivePaused && !isDetailModalOpen && (
+          <div className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full bg-content1/90 px-3.5 py-1.5 shadow-lg border border-warning/40 backdrop-blur-md text-xs font-medium text-warning select-none">
+            <span className="flex h-2 w-2 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warning opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-warning" />
+            </span>
+            <span>
+              {isCtrlHeld
+                ? '按住 Ctrl 暂停刷新中 (松开恢复)'
+                : isHoverPaused
+                  ? '鼠标悬停已暂停 (移出恢复)'
+                  : '已暂停刷新 (按空格键或点击右上角继续)'}
+            </span>
+          </div>
+        )}
         {grouped ? (
           connectionGroups.length > 0 ? (
             <GroupedVirtuoso

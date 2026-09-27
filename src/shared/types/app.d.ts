@@ -61,6 +61,7 @@ interface AppConfig {
   connectionGroupSort?: 'name' | 'count' | 'upload' | 'download' | 'uploadSpeed' | 'downloadSpeed'
   connectionGroupDirection?: 'asc' | 'desc'
   connectionInterval?: number
+  connectionPauseOnHover?: boolean
   spinFloatingIcon?: boolean
   disableTray?: boolean
   showFloatingWindow?: boolean
