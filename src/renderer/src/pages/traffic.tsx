@@ -248,16 +248,19 @@ const TrafficPage: React.FC = () => {
         {/* 控制工具栏：与 Connections 页面 100% 结构和尺寸对齐 */}
         <div className="overflow-x-auto sticky top-0 z-40">
           <div className="flex p-2 gap-2">
+            {/* 单元 1：代理与策略组 */}
             <Tabs
-              selectedKey={dimension}
-              onSelectionChange={(key) => setDimension(key as TrafficDimension)}
+              selectedKey={dimension === 'nodes' || dimension === 'groups' ? dimension : ''}
+              onSelectionChange={(key) => {
+                if (key) setDimension(key as TrafficDimension)
+              }}
               className="connection-tabs w-fit h-8 shrink-0"
               data-color="primary"
               data-size="sm"
               data-full-width={false}
               variant="secondary"
             >
-              <Tabs.List aria-label="统计维度">
+              <Tabs.List aria-label="代理链路维度">
                 <Tabs.Tab key="nodes" id="nodes">
                   <Badge.Anchor className="items-center gap-0.5 leading-none">
                     <span>节点</span>
@@ -288,6 +291,28 @@ const TrafficPage: React.FC = () => {
                   </Badge.Anchor>
                   <Tabs.Indicator />
                 </Tabs.Tab>
+              </Tabs.List>
+            </Tabs>
+
+            <Separator orientation="vertical" className="h-4 self-center bg-default-200 shrink-0" />
+
+            {/* 单元 2：连接、进程与域名 */}
+            <Tabs
+              selectedKey={
+                dimension === 'connections' || dimension === 'processes' || dimension === 'hosts'
+                  ? dimension
+                  : ''
+              }
+              onSelectionChange={(key) => {
+                if (key) setDimension(key as TrafficDimension)
+              }}
+              className="connection-tabs w-fit h-8 shrink-0"
+              data-color="primary"
+              data-size="sm"
+              data-full-width={false}
+              variant="secondary"
+            >
+              <Tabs.List aria-label="网络流量维度">
                 <Tabs.Tab key="connections" id="connections">
                   <Badge.Anchor className="items-center gap-0.5 leading-none">
                     <span>连接</span>
