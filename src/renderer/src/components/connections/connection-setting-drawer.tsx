@@ -24,7 +24,8 @@ const ConnectionSettingDrawer: React.FC<Props> = (props) => {
     connectionGroupByProcess = false,
     connectionGroupSort = 'name',
     connectionGroupDirection = 'asc',
-    connectionPauseOnHover = false
+    connectionPauseOnHover = false,
+    connectionMaxClosed = 1000
   } = appConfig || {}
   const [intervalInput, setIntervalInput] = useState(connectionInterval)
   const [isOpen, setIsOpen] = useState(true)
@@ -224,7 +225,7 @@ const ConnectionSettingDrawer: React.FC<Props> = (props) => {
                   </div>
                 </SettingItem>
               )}
-              <SettingItem title="刷新间隔" {...settingItemProps}>
+              <SettingItem title="刷新间隔" {...settingItemProps} divider>
                 <div className="setting-item__inline-controls">
                   {intervalInput !== connectionInterval && (
                     <Button
@@ -254,6 +255,57 @@ const ConnectionSettingDrawer: React.FC<Props> = (props) => {
                     <InputGroup.Suffix>ms</InputGroup.Suffix>
                   </InputGroup>
                 </div>
+              </SettingItem>
+              <SettingItem
+                title={
+                  <div className="flex flex-col">
+                    <span>历史连接保留上限</span>
+                    <span className="text-xs text-foreground-400 font-normal">
+                      已断开连接的最大缓存记录数
+                    </span>
+                  </div>
+                }
+                {...settingItemProps}
+              >
+                <Select
+                  aria-label="历史连接保留上限"
+                  className="w-32"
+                  variant="secondary"
+                  value={String(connectionMaxClosed)}
+                  onChange={(value) => {
+                    if (Array.isArray(value) || value == null) return
+                    patchAppConfig({ connectionMaxClosed: Number(value) })
+                  }}
+                >
+                  <Select.Trigger className="h-8 min-h-8 py-0">
+                    <Select.Value />
+                    <Select.Indicator />
+                  </Select.Trigger>
+                  <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
+                    <ListBox>
+                      <ListBox.Item id="200" textValue="200 条">
+                        200 条
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                      <ListBox.Item id="500" textValue="500 条">
+                        500 条
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                      <ListBox.Item id="1000" textValue="1000 条 (推荐)">
+                        1000 条 (推荐)
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                      <ListBox.Item id="2000" textValue="2000 条">
+                        2000 条
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                      <ListBox.Item id="5000" textValue="5000 条">
+                        5000 条
+                        <ListBox.ItemIndicator />
+                      </ListBox.Item>
+                    </ListBox>
+                  </Select.Popover>
+                </Select>
               </SettingItem>
             </div>
           </Drawer.Body>

@@ -62,6 +62,7 @@ interface AppConfig {
   connectionGroupDirection?: 'asc' | 'desc'
   connectionInterval?: number
   connectionPauseOnHover?: boolean
+  connectionMaxClosed?: number
   spinFloatingIcon?: boolean
   disableTray?: boolean
   showFloatingWindow?: boolean

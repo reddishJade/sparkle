@@ -28,6 +28,7 @@ export const defaultConfig: AppConfig = {
   connectionGroupDirection: 'asc',
   connectionInterval: 500,
   connectionPauseOnHover: false,
+  connectionMaxClosed: 1000,
   gistSyncEnabled: false,
   gistEncrypted: false,
   useSubStore: true,

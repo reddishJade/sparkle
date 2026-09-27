@@ -50,7 +50,8 @@ const Connections: React.FC = () => {
     connectionGroupByProcess = false,
     connectionGroupSort = 'name',
     connectionGroupDirection = 'asc',
-    connectionPauseOnHover = false
+    connectionPauseOnHover = false,
+    connectionMaxClosed = 1000
   } = appConfig || {}
   const [connectionsInfo, setConnectionsInfo] = useState<ControllerConnections>()
   const [allConnections, setAllConnections] =
@@ -468,12 +469,12 @@ const Connections: React.FC = () => {
 
       const finalAllConnections =
         newConnections.length > 0
-          ? allConns.slice(-(liveConns.length + 200))
+          ? allConns.slice(-(liveConns.length + connectionMaxClosed))
           : allConns
       setAllConnections(finalAllConnections)
       cachedConnections = finalAllConnections
     },
-    [connectionInterval]
+    [connectionInterval, connectionMaxClosed]
   )
 
   const processConnectionsRef = useRef(processConnections)
