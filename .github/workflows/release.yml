@@ -178,25 +178,18 @@ jobs:
         shell: bash
         run: |
           PREVIOUS_TAG=$(
-            git tag --merged HEAD |
-              awk -v current="$RELEASE_VERSION" '
-                {
-                  normalized = $0
-                  sub(/^v/, "", normalized)
-                  if (normalized ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ && normalized != current) {
-                    print normalized "\t" $0
-                  }
-                }
-              ' |
-              sort -t $'\t' -k1,1V |
-              tail -n 1 |
-              cut -f 2-
+            git describe --tags --match="[0-9]*" --match="v[0-9]*" --abbrev=0 HEAD^ 2>/dev/null || true
           )
+          if [[ -z "$PREVIOUS_TAG" ]]; then
+            PREVIOUS_TAG=$(
+              git tag -l 'v*' -l '[0-9]*' --sort=-v:refname | grep -Ev "^v?${RELEASE_VERSION}$" | head -n 1 || true
+            )
+          fi
 
           if [[ -n "$PREVIOUS_TAG" ]]; then
             TEXT=$(git log "$PREVIOUS_TAG..HEAD" --pretty=format:%s | grep -Ev '^update version to [0-9]+\.[0-9]+\.[0-9]+$' || true)
           else
-            TEXT=$(git log HEAD --pretty=format:%s | grep -Ev '^update version to [0-9]+\.[0-9]+\.[0-9]+$' || true)
+            TEXT=$(git log -15 --pretty=format:%s | grep -Ev '^update version to [0-9]+\.[0-9]+\.[0-9]+$' || true)
           fi
           if [[ -z "$TEXT" ]]; then
             TEXT=$(git log -1 --pretty=format:%s)
