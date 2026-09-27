@@ -17,6 +17,8 @@ import ConfirmModal from '@renderer/components/base/base-confirm'
 import { calcTraffic } from '@renderer/utils/calc'
 import { clearTrafficStats, getTrafficStats } from '@renderer/utils/ipc'
 import type {
+  TrafficConnectionItem,
+  TrafficDimension,
   TrafficStatsSummary,
   TrafficSummaryItem,
   TrafficTimeRange
@@ -25,15 +27,65 @@ import { CgTrash } from 'react-icons/cg'
 import { HiSortAscending, HiSortDescending } from 'react-icons/hi'
 import { IoRefresh } from 'react-icons/io5'
 
+const STORAGE_KEY = 'sparkle_traffic_preferences'
+
+interface TrafficPreferences {
+  timeRange?: TrafficTimeRange
+  dimension?: TrafficDimension
+  sortBy?: 'total' | 'upload' | 'download'
+  sortDirection?: 'asc' | 'desc'
+}
+
+function loadStoredPreferences(): TrafficPreferences {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) return JSON.parse(raw) as TrafficPreferences
+  } catch {
+    // ignore
+  }
+  return {}
+}
+
+function formatTime(timeStr?: string): string {
+  if (!timeStr) return ''
+  const d = new Date(timeStr)
+  if (isNaN(d.getTime())) return timeStr
+  const h = String(d.getHours()).padStart(2, '0')
+  const m = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${h}:${m}:${s}`
+}
+
+type DisplayItem =
+  | { kind: 'summary'; data: TrafficSummaryItem }
+  | { kind: 'connection'; data: TrafficConnectionItem }
+
 const TrafficPage: React.FC = () => {
-  const [timeRange, setTimeRange] = useState<TrafficTimeRange>('today')
-  const [dimension, setDimension] = useState<'nodes' | 'groups'>('nodes')
+  const initialPrefs = useMemo(() => loadStoredPreferences(), [])
+  const [timeRange, setTimeRange] = useState<TrafficTimeRange>(initialPrefs.timeRange || 'today')
+  const [dimension, setDimension] = useState<TrafficDimension>(initialPrefs.dimension || 'nodes')
   const [filter, setFilter] = useState('')
-  const [sortBy, setSortBy] = useState<'total' | 'upload' | 'download'>('total')
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
+  const [sortBy, setSortBy] = useState<'total' | 'upload' | 'download'>(
+    initialPrefs.sortBy || 'total'
+  )
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
+    initialPrefs.sortDirection || 'desc'
+  )
   const [stats, setStats] = useState<TrafficStatsSummary | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showClearConfirm, setShowClearConfirm] = useState(false)
+
+  // 选项持久化记忆：切换页面或重启后保留上一次的视图偏好
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ timeRange, dimension, sortBy, sortDirection })
+      )
+    } catch {
+      // ignore
+    }
+  }, [timeRange, dimension, sortBy, sortDirection])
 
   const loadData = useCallback(async () => {
     try {
@@ -61,7 +113,7 @@ const TrafficPage: React.FC = () => {
     }
   }, [loadData])
 
-  const handleClear = async (): Promise<void> => {
+  const handleClear = useCallback(async (): Promise<void> => {
     setShowClearConfirm(false)
     try {
       await clearTrafficStats()
@@ -69,31 +121,48 @@ const TrafficPage: React.FC = () => {
     } catch {
       // ignore
     }
-  }
+  }, [loadData])
 
-  const rawItems: TrafficSummaryItem[] = useMemo(() => {
+  const filteredAndSortedItems: DisplayItem[] = useMemo(() => {
     if (!stats) return []
-    return dimension === 'nodes' ? stats.nodes : stats.groups
-  }, [stats, dimension])
+    const dir = sortDirection === 'asc' ? 1 : -1
+    const q = filter.trim().toLowerCase()
 
-  const filteredAndSortedItems = useMemo(() => {
-    let list = rawItems
-    if (filter.trim() !== '') {
-      const q = filter.trim().toLowerCase()
-      list = list.filter((item) => item.name.toLowerCase().includes(q))
+    if (dimension === 'connections') {
+      let list = stats.connections || []
+      if (q !== '') {
+        list = list.filter(
+          (item) =>
+            item.destination.toLowerCase().includes(q) ||
+            (item.process && item.process.toLowerCase().includes(q)) ||
+            item.node.toLowerCase().includes(q) ||
+            (item.rule && item.rule.toLowerCase().includes(q))
+        )
+      }
+      const sorted = [...list].sort((a, b) => {
+        if (sortBy === 'upload') return (a.upload - b.upload) * dir
+        if (sortBy === 'download') return (a.download - b.download) * dir
+        return (a.total - b.total) * dir
+      })
+      return sorted.map((item) => ({ kind: 'connection', data: item }))
     }
 
-    const dir = sortDirection === 'asc' ? 1 : -1
-    return [...list].sort((a, b) => {
-      if (sortBy === 'upload') {
-        return (a.upload - b.upload) * dir
-      }
-      if (sortBy === 'download') {
-        return (a.download - b.download) * dir
-      }
+    let summaryList: TrafficSummaryItem[] = []
+    if (dimension === 'nodes') summaryList = stats.nodes || []
+    else if (dimension === 'groups') summaryList = stats.groups || []
+    else if (dimension === 'processes') summaryList = stats.processes || []
+    else if (dimension === 'hosts') summaryList = stats.hosts || []
+
+    if (q !== '') {
+      summaryList = summaryList.filter((item) => item.name.toLowerCase().includes(q))
+    }
+    const sorted = [...summaryList].sort((a, b) => {
+      if (sortBy === 'upload') return (a.upload - b.upload) * dir
+      if (sortBy === 'download') return (a.download - b.download) * dir
       return (a.total - b.total) * dir
     })
-  }, [rawItems, filter, sortBy, sortDirection])
+    return sorted.map((item) => ({ kind: 'summary', data: item }))
+  }, [stats, dimension, filter, sortBy, sortDirection])
 
   return (
     <BasePage
@@ -162,7 +231,7 @@ const TrafficPage: React.FC = () => {
                 确定要清空所有持久化流量统计数据吗？此操作无法撤销。
               </p>
               <p className="text-xs text-foreground-400 mt-2">
-                清空后，所有节点与策略组的累计流量将被重置，统计将从当前时刻开始重新累计。
+                清空后，所有节点、策略组、连接、进程及域名的累计流量将被重置，统计将从当前时刻开始重新累计。
               </p>
             </div>
           }
@@ -181,7 +250,7 @@ const TrafficPage: React.FC = () => {
           <div className="flex p-2 gap-2">
             <Tabs
               selectedKey={dimension}
-              onSelectionChange={(key) => setDimension(key as 'nodes' | 'groups')}
+              onSelectionChange={(key) => setDimension(key as TrafficDimension)}
               className="connection-tabs w-fit h-8 shrink-0"
               data-color="primary"
               data-size="sm"
@@ -215,6 +284,51 @@ const TrafficPage: React.FC = () => {
                       data-shape="circle"
                     >
                       <Badge.Label>{stats?.groups.length ?? 0}</Badge.Label>
+                    </Badge>
+                  </Badge.Anchor>
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+                <Tabs.Tab key="connections" id="connections">
+                  <Badge.Anchor className="items-center gap-0.5 leading-none">
+                    <span>连接</span>
+                    <Badge
+                      size="sm"
+                      data-color={dimension === 'connections' ? 'primary' : 'default'}
+                      variant="soft"
+                      data-outline={false}
+                      data-shape="circle"
+                    >
+                      <Badge.Label>{stats?.connections.length ?? 0}</Badge.Label>
+                    </Badge>
+                  </Badge.Anchor>
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+                <Tabs.Tab key="processes" id="processes">
+                  <Badge.Anchor className="items-center gap-0.5 leading-none">
+                    <span>进程</span>
+                    <Badge
+                      size="sm"
+                      data-color={dimension === 'processes' ? 'primary' : 'default'}
+                      variant="soft"
+                      data-outline={false}
+                      data-shape="circle"
+                    >
+                      <Badge.Label>{stats?.processes.length ?? 0}</Badge.Label>
+                    </Badge>
+                  </Badge.Anchor>
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+                <Tabs.Tab key="hosts" id="hosts">
+                  <Badge.Anchor className="items-center gap-0.5 leading-none">
+                    <span>域名</span>
+                    <Badge
+                      size="sm"
+                      data-color={dimension === 'hosts' ? 'primary' : 'default'}
+                      variant="soft"
+                      data-outline={false}
+                      data-shape="circle"
+                    >
+                      <Badge.Label>{stats?.hosts.length ?? 0}</Badge.Label>
                     </Badge>
                   </Badge.Anchor>
                   <Tabs.Indicator />
@@ -342,51 +456,137 @@ const TrafficPage: React.FC = () => {
             <Virtuoso
               className="h-full"
               data={filteredAndSortedItems}
-              itemContent={(index, item) => (
-                <div
-                  key={item.name}
-                  className={`px-2 pb-1 ${index === 0 ? 'pt-1' : ''}`}
-                  style={{ minHeight: 60 }}
-                >
-                  <Card className="w-full">
-                    <Card.Content className="py-2.5 px-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <small className="w-6 shrink-0 text-right font-mono text-foreground-400">
-                            {index + 1}
-                          </small>
-                          <div className="truncate text-left text-sm font-medium">
-                            <span className="flag-emoji">{item.name}</span>
+              itemContent={(index, item) => {
+                if (item.kind === 'connection') {
+                  const conn = item.data
+                  return (
+                    <div
+                      key={conn.id}
+                      className={`px-2 pb-1 ${index === 0 ? 'pt-1' : ''}`}
+                      style={{ minHeight: 64 }}
+                    >
+                      <Card className="w-full">
+                        <Card.Content className="py-2 px-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              <small className="w-6 shrink-0 text-right font-mono text-foreground-400">
+                                {index + 1}
+                              </small>
+                              <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-[10px] px-1 py-0.5 rounded bg-default-100 font-mono text-foreground-500 uppercase leading-none shrink-0">
+                                    {conn.network || 'TCP'}
+                                  </span>
+                                  <span className="truncate text-sm font-medium select-text">
+                                    {conn.destination}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-foreground-400 truncate">
+                                  {conn.process && (
+                                    <>
+                                      <span className="truncate max-w-[130px] text-foreground-500 font-medium">
+                                        {conn.process}
+                                      </span>
+                                      <span>•</span>
+                                    </>
+                                  )}
+                                  <span className="truncate max-w-[150px] flag-emoji">
+                                    {conn.node}
+                                  </span>
+                                  {conn.rule && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="truncate max-w-[110px]">{conn.rule}</span>
+                                    </>
+                                  )}
+                                  {conn.start && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="shrink-0 font-mono text-[11px]">
+                                        {formatTime(conn.start)}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+                              <Chip
+                                size="sm"
+                                data-color="default"
+                                variant="tertiary"
+                                data-outline="true"
+                                data-radius="sm"
+                                className="font-mono text-xs"
+                              >
+                                <Chip.Label>
+                                  ↑ {calcTraffic(conn.upload)} ↓ {calcTraffic(conn.download)}
+                                </Chip.Label>
+                              </Chip>
+                              <Chip
+                                size="sm"
+                                data-color="primary"
+                                variant="soft"
+                                data-radius="sm"
+                                className="font-mono text-xs font-semibold"
+                              >
+                                <Chip.Label>{calcTraffic(conn.total)}</Chip.Label>
+                              </Chip>
+                            </div>
+                          </div>
+                        </Card.Content>
+                      </Card>
+                    </div>
+                  )
+                }
+
+                const summary = item.data
+                return (
+                  <div
+                    key={summary.name}
+                    className={`px-2 pb-1 ${index === 0 ? 'pt-1' : ''}`}
+                    style={{ minHeight: 60 }}
+                  >
+                    <Card className="w-full">
+                      <Card.Content className="py-2.5 px-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <small className="w-6 shrink-0 text-right font-mono text-foreground-400">
+                              {index + 1}
+                            </small>
+                            <div className="truncate text-left text-sm font-medium">
+                              <span className="flag-emoji">{summary.name}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+                            <Chip
+                              size="sm"
+                              data-color="default"
+                              variant="tertiary"
+                              data-outline="true"
+                              data-radius="sm"
+                              className="font-mono text-xs"
+                            >
+                              <Chip.Label>
+                                ↑ {calcTraffic(summary.upload)} ↓ {calcTraffic(summary.download)}
+                              </Chip.Label>
+                            </Chip>
+                            <Chip
+                              size="sm"
+                              data-color="primary"
+                              variant="soft"
+                              data-radius="sm"
+                              className="font-mono text-xs font-semibold"
+                            >
+                              <Chip.Label>{calcTraffic(summary.total)}</Chip.Label>
+                            </Chip>
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
-                          <Chip
-                            size="sm"
-                            data-color="default"
-                            variant="tertiary"
-                            data-outline="true"
-                            data-radius="sm"
-                            className="font-mono text-xs"
-                          >
-                            <Chip.Label>
-                              ↑ {calcTraffic(item.upload)} ↓ {calcTraffic(item.download)}
-                            </Chip.Label>
-                          </Chip>
-                          <Chip
-                            size="sm"
-                            data-color="primary"
-                            variant="soft"
-                            data-radius="sm"
-                            className="font-mono text-xs font-semibold"
-                          >
-                            <Chip.Label>{calcTraffic(item.total)}</Chip.Label>
-                          </Chip>
-                        </div>
-                      </div>
-                    </Card.Content>
-                  </Card>
-                </div>
-              )}
+                      </Card.Content>
+                    </Card>
+                  </div>
+                )
+              }}
             />
           )}
         </div>

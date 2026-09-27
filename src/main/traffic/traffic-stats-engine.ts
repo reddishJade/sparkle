@@ -1,6 +1,7 @@
 import type {
   CheckpointConnection,
   DayTrafficStats,
+  TrafficConnectionItem,
   TrafficStatsStorage,
   TrafficStatsSummary,
   TrafficSummaryItem,
@@ -28,6 +29,16 @@ export function parseChains(chains?: string[]): { node: string; group: string; c
   return { node, group, chains: validChains }
 }
 
+export function extractProcessName(process?: string, processPath?: string): string {
+  if (process && process.trim()) return process.trim()
+  if (processPath && processPath.trim()) {
+    const p = processPath.trim()
+    const parts = p.split(/[/\\]/)
+    return parts[parts.length - 1] || p
+  }
+  return ''
+}
+
 interface ActiveConnectionState {
   upload: number
   download: number
@@ -35,6 +46,14 @@ interface ActiveConnectionState {
   group: string
   chains: string[]
   lastSeen: number
+  destination: string
+  host: string
+  port: string
+  network: string
+  process: string
+  processPath?: string
+  rule?: string
+  start?: string
 }
 
 export class TrafficStatsEngine {
@@ -49,7 +68,10 @@ export class TrafficStatsEngine {
     rawGlobalDownload: 0,
     unknownUpload: 0,
     unknownDownload: 0,
-    records: {}
+    records: {},
+    connections: {},
+    processes: {},
+    hosts: {}
   }
   private activeConns = new Map<string, ActiveConnectionState>()
   private lastGlobalUp: number | null = null
@@ -84,6 +106,9 @@ export class TrafficStatsEngine {
   }
 
   private ensureDayStatsStructure(dayStats: DayTrafficStats): void {
+    if (!dayStats.connections) dayStats.connections = {}
+    if (!dayStats.processes) dayStats.processes = {}
+    if (!dayStats.hosts) dayStats.hosts = {}
     if (dayStats.attributedUpload === undefined || dayStats.attributedDownload === undefined) {
       let sumUp = 0
       let sumDown = 0
@@ -110,6 +135,18 @@ export class TrafficStatsEngine {
     return this.data
   }
 
+  private pruneConnections(conns: Record<string, TrafficConnectionItem>, keepCount: number): void {
+    const entries = Object.entries(conns)
+    if (entries.length <= keepCount) return
+    entries.sort((a, b) => b[1].total - a[1].total)
+    const keep = new Set(entries.slice(0, keepCount).map(([id]) => id))
+    for (const key of Object.keys(conns)) {
+      if (!keep.has(key)) {
+        delete conns[key]
+      }
+    }
+  }
+
   private getOrCreateDayStats(dayStr: string): DayTrafficStats {
     if (!this.data.days[dayStr]) {
       this.data.days[dayStr] = {
@@ -122,7 +159,10 @@ export class TrafficStatsEngine {
         rawGlobalDownload: 0,
         unknownUpload: 0,
         unknownDownload: 0,
-        records: {}
+        records: {},
+        connections: {},
+        processes: {},
+        hosts: {}
       }
       this.dirty = true
     } else {
@@ -241,13 +281,28 @@ export class TrafficStatsEngine {
       this.activeConns.clear()
       for (const conn of rawConns) {
         const { node, group, chains } = parseChains(conn.chains)
+        const host = conn.metadata?.host || conn.metadata?.destinationIP || ''
+        const port = conn.metadata?.destinationPort ? String(conn.metadata.destinationPort) : ''
+        const destination = host && port ? `${host}:${port}` : host || port || 'unknown'
+        const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
+        const network = conn.metadata?.network || 'tcp'
+        const rule = conn.rule || ''
+        const start = conn.start
         this.activeConns.set(conn.id, {
           upload: Math.max(0, conn.upload),
           download: Math.max(0, conn.download),
           node,
           group,
           chains,
-          lastSeen: now
+          lastSeen: now,
+          destination,
+          host,
+          port,
+          network,
+          process,
+          processPath: conn.metadata?.processPath,
+          rule,
+          start
         })
       }
 
@@ -279,13 +334,28 @@ export class TrafficStatsEngine {
       this.activeConns.clear()
       for (const conn of rawConns) {
         const { node, group, chains } = parseChains(conn.chains)
+        const host = conn.metadata?.host || conn.metadata?.destinationIP || ''
+        const port = conn.metadata?.destinationPort ? String(conn.metadata.destinationPort) : ''
+        const destination = host && port ? `${host}:${port}` : host || port || 'unknown'
+        const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
+        const network = conn.metadata?.network || 'tcp'
+        const rule = conn.rule || ''
+        const start = conn.start
         this.activeConns.set(conn.id, {
           upload: Math.max(0, conn.upload),
           download: Math.max(0, conn.download),
           node,
           group,
           chains,
-          lastSeen: now
+          lastSeen: now,
+          destination,
+          host,
+          port,
+          network,
+          process,
+          processPath: conn.metadata?.processPath,
+          rule,
+          start
         })
       }
 
@@ -315,6 +385,14 @@ export class TrafficStatsEngine {
       const { node, group, chains } = parseChains(conn.chains)
       const prev = this.activeConns.get(conn.id)
 
+      const host = conn.metadata?.host || conn.metadata?.destinationIP || ''
+      const port = conn.metadata?.destinationPort ? String(conn.metadata.destinationPort) : ''
+      const destination = host && port ? `${host}:${port}` : host || port || 'unknown'
+      const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
+      const network = conn.metadata?.network || 'tcp'
+      const rule = conn.rule || ''
+      const start = conn.start
+
       let connUpDelta: number
       let connDownDelta: number
 
@@ -328,6 +406,14 @@ export class TrafficStatsEngine {
         prev.group = group
         prev.chains = chains
         prev.lastSeen = now
+        prev.destination = destination
+        prev.host = host
+        prev.port = port
+        prev.network = network
+        prev.process = process
+        prev.processPath = conn.metadata?.processPath
+        prev.rule = rule
+        prev.start = start
       } else {
         // 新连接首次出现
         connUpDelta = Math.max(0, conn.upload)
@@ -338,7 +424,15 @@ export class TrafficStatsEngine {
           node,
           group,
           chains,
-          lastSeen: now
+          lastSeen: now,
+          destination,
+          host,
+          port,
+          network,
+          process,
+          processPath: conn.metadata?.processPath,
+          rule,
+          start
         })
       }
 
@@ -346,6 +440,7 @@ export class TrafficStatsEngine {
         sumConnUpDelta += connUpDelta
         sumConnDownDelta += connDownDelta
 
+        // 1. 代理节点与策略组统计
         const recordKey = `${node}:::${group}:::${chains.join('>')}`
         let record = dayStats.records[recordKey]
         if (!record) {
@@ -374,6 +469,88 @@ export class TrafficStatsEngine {
         }
         sessionRecord.upload += connUpDelta
         sessionRecord.download += connDownDelta
+
+        // 2. 连接明细记录 (基于连接的流量统计)
+        if (!dayStats.connections) dayStats.connections = {}
+        let dayConn = dayStats.connections[conn.id]
+        if (!dayConn) {
+          dayConn = {
+            id: conn.id,
+            destination,
+            host,
+            port,
+            network,
+            process,
+            processPath: conn.metadata?.processPath,
+            node,
+            group,
+            chains,
+            rule,
+            upload: 0,
+            download: 0,
+            total: 0,
+            start,
+            lastSeen: now
+          }
+          dayStats.connections[conn.id] = dayConn
+        }
+        dayConn.upload += connUpDelta
+        dayConn.download += connDownDelta
+        dayConn.total = dayConn.upload + dayConn.download
+        dayConn.lastSeen = now
+
+        if (!this.sessionStats.connections) this.sessionStats.connections = {}
+        let sessConn = this.sessionStats.connections[conn.id]
+        if (!sessConn) {
+          sessConn = {
+            id: conn.id,
+            destination,
+            host,
+            port,
+            network,
+            process,
+            processPath: conn.metadata?.processPath,
+            node,
+            group,
+            chains,
+            rule,
+            upload: 0,
+            download: 0,
+            total: 0,
+            start,
+            lastSeen: now
+          }
+          this.sessionStats.connections[conn.id] = sessConn
+        }
+        sessConn.upload += connUpDelta
+        sessConn.download += connDownDelta
+        sessConn.total = sessConn.upload + sessConn.download
+        sessConn.lastSeen = now
+
+        // 3. 进程维度聚合
+        const procKey = process || '其他'
+        if (!dayStats.processes) dayStats.processes = {}
+        if (!dayStats.processes[procKey]) dayStats.processes[procKey] = { upload: 0, download: 0 }
+        dayStats.processes[procKey].upload += connUpDelta
+        dayStats.processes[procKey].download += connDownDelta
+
+        if (!this.sessionStats.processes) this.sessionStats.processes = {}
+        if (!this.sessionStats.processes[procKey]) this.sessionStats.processes[procKey] = { upload: 0, download: 0 }
+        this.sessionStats.processes[procKey].upload += connUpDelta
+        this.sessionStats.processes[procKey].download += connDownDelta
+
+        // 4. 目标域名/主机维度聚合
+        const hostKey = host || '其他'
+        if (!dayStats.hosts) dayStats.hosts = {}
+        if (!dayStats.hosts[hostKey]) dayStats.hosts[hostKey] = { upload: 0, download: 0 }
+        dayStats.hosts[hostKey].upload += connUpDelta
+        dayStats.hosts[hostKey].download += connDownDelta
+
+        if (!this.sessionStats.hosts) this.sessionStats.hosts = {}
+        if (!this.sessionStats.hosts[hostKey]) this.sessionStats.hosts[hostKey] = { upload: 0, download: 0 }
+        this.sessionStats.hosts[hostKey].upload += connUpDelta
+        this.sessionStats.hosts[hostKey].download += connDownDelta
+
         this.dirty = true
       }
     }
@@ -385,6 +562,14 @@ export class TrafficStatsEngine {
           this.activeConns.delete(id)
         }
       }
+    }
+
+    // 适度修剪连接数，防止占用过多存储
+    if (dayStats.connections && Object.keys(dayStats.connections).length > 1000) {
+      this.pruneConnections(dayStats.connections, 800)
+    }
+    if (this.sessionStats.connections && Object.keys(this.sessionStats.connections).length > 2000) {
+      this.pruneConnections(this.sessionStats.connections, 1500)
     }
 
     // 流量守恒与待归属余额对账：
@@ -441,6 +626,9 @@ export class TrafficStatsEngine {
 
     const nodeMap = new Map<string, { upload: number; download: number }>()
     const groupMap = new Map<string, { upload: number; download: number }>()
+    const procMap = new Map<string, { upload: number; download: number }>()
+    const hostMap = new Map<string, { upload: number; download: number }>()
+    const connMap = new Map<string, TrafficConnectionItem>()
 
     for (const dayStats of statsList) {
       unknownUpload += dayStats.unknownUpload
@@ -463,6 +651,49 @@ export class TrafficStatsEngine {
           existingGroup.download += record.download
         } else {
           groupMap.set(record.group, { upload: record.upload, download: record.download })
+        }
+      }
+
+      // 进程统计
+      if (dayStats.processes) {
+        for (const [name, stats] of Object.entries(dayStats.processes)) {
+          const existing = procMap.get(name)
+          if (existing) {
+            existing.upload += stats.upload
+            existing.download += stats.download
+          } else {
+            procMap.set(name, { upload: stats.upload, download: stats.download })
+          }
+        }
+      }
+
+      // 域名统计
+      if (dayStats.hosts) {
+        for (const [name, stats] of Object.entries(dayStats.hosts)) {
+          const existing = hostMap.get(name)
+          if (existing) {
+            existing.upload += stats.upload
+            existing.download += stats.download
+          } else {
+            hostMap.set(name, { upload: stats.upload, download: stats.download })
+          }
+        }
+      }
+
+      // 连接统计
+      if (dayStats.connections) {
+        for (const [id, item] of Object.entries(dayStats.connections)) {
+          const existing = connMap.get(id)
+          if (existing) {
+            existing.upload += item.upload
+            existing.download += item.download
+            existing.total = existing.upload + existing.download
+            if (item.lastSeen && (!existing.lastSeen || item.lastSeen > existing.lastSeen)) {
+              existing.lastSeen = item.lastSeen
+            }
+          } else {
+            connMap.set(id, { ...item })
+          }
         }
       }
     }
@@ -491,9 +722,37 @@ export class TrafficStatsEngine {
       })
     }
 
+    const processes: TrafficSummaryItem[] = []
+    for (const [name, stats] of procMap.entries()) {
+      processes.push({
+        name,
+        upload: stats.upload,
+        download: stats.download,
+        total: stats.upload + stats.download
+      })
+    }
+
+    const hosts: TrafficSummaryItem[] = []
+    for (const [name, stats] of hostMap.entries()) {
+      hosts.push({
+        name,
+        upload: stats.upload,
+        download: stats.download,
+        total: stats.upload + stats.download
+      })
+    }
+
+    const connections: TrafficConnectionItem[] = Array.from(connMap.values())
+
     // 默认按 Total 降序排序
     nodes.sort((a, b) => b.total - a.total)
     groups.sort((a, b) => b.total - a.total)
+    processes.sort((a, b) => b.total - a.total)
+    hosts.sort((a, b) => b.total - a.total)
+    connections.sort((a, b) => b.total - a.total)
+
+    // 最多返回前 1000 条连接
+    const trimmedConnections = connections.slice(0, 1000)
 
     const totalUpload = sumNodeUpload + unknownUpload
     const totalDownload = sumNodeDownload + unknownDownload
@@ -510,6 +769,9 @@ export class TrafficStatsEngine {
       unknownTotal,
       nodes,
       groups,
+      connections: trimmedConnections,
+      processes,
+      hosts,
       updatedAt: now
     }
   }
@@ -547,7 +809,10 @@ export class TrafficStatsEngine {
       rawGlobalDownload: 0,
       unknownUpload: 0,
       unknownDownload: 0,
-      records: {}
+      records: {},
+      connections: {},
+      processes: {},
+      hosts: {}
     }
     this.data.checkpoint = {
       coreInstanceId: this.currentCoreInstanceId,
@@ -559,3 +824,4 @@ export class TrafficStatsEngine {
     this.dirty = true
   }
 }
+

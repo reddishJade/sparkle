@@ -965,5 +965,247 @@ describe('TrafficStatsEngine', () => {
     assert.equal(sessionSummary.total, 0)
     assert.equal(sessionSummary.nodes.length, 0)
   })
+
+  // 21. 基于连接的流量统计：按连接记录流量、包含元数据与上下行流量
+  it('21. 基于连接的流量统计：记录连接元数据、上下行流量与排序', () => {
+    const engine = new TrafficStatsEngine()
+    engine.feedSnapshot(
+      {
+        uploadTotal: 100,
+        downloadTotal: 200,
+        connections: [
+          {
+            id: 'conn-1',
+            upload: 10,
+            download: 20,
+            chains: ['NodeUS', 'ProxyGroup'],
+            rule: 'Match',
+            start: '2026-09-26T12:00:00Z',
+            metadata: {
+              network: 'tcp',
+              host: 'api.github.com',
+              destinationIP: '140.82.121.4',
+              destinationPort: '443',
+              process: 'git.exe',
+              processPath: 'C:\\Program Files\\Git\\bin\\git.exe'
+            }
+          } as any,
+          {
+            id: 'conn-2',
+            upload: 50,
+            download: 100,
+            chains: ['NodeHK', 'ProxyGroup'],
+            rule: 'GeoIP',
+            start: '2026-09-26T12:00:01Z',
+            metadata: {
+              network: 'udp',
+              host: 'discord.com',
+              destinationIP: '162.159.130.233',
+              destinationPort: '50001',
+              process: 'Discord.exe',
+              processPath: 'C:\\Users\\User\\Discord.exe'
+            }
+          } as any
+        ]
+      },
+      baseTime
+    )
+
+    // 第二次采样增量
+    engine.feedSnapshot(
+      {
+        uploadTotal: 180,
+        downloadTotal: 350,
+        connections: [
+          {
+            id: 'conn-1',
+            upload: 30, // +20
+            download: 70, // +50
+            chains: ['NodeUS', 'ProxyGroup'],
+            rule: 'Match',
+            start: '2026-09-26T12:00:00Z',
+            metadata: {
+              network: 'tcp',
+              host: 'api.github.com',
+              destinationIP: '140.82.121.4',
+              destinationPort: '443',
+              process: 'git.exe',
+              processPath: 'C:\\Program Files\\Git\\bin\\git.exe'
+            }
+          } as any,
+          {
+            id: 'conn-2',
+            upload: 110, // +60
+            download: 200, // +100
+            chains: ['NodeHK', 'ProxyGroup'],
+            rule: 'GeoIP',
+            start: '2026-09-26T12:00:01Z',
+            metadata: {
+              network: 'udp',
+              host: 'discord.com',
+              destinationIP: '162.159.130.233',
+              destinationPort: '50001',
+              process: 'Discord.exe',
+              processPath: 'C:\\Users\\User\\Discord.exe'
+            }
+          } as any
+        ]
+      },
+      baseTime + 1000
+    )
+
+    const summary = engine.getSummary('today', baseTime + 1000)
+    assert.equal(summary.connections.length, 2)
+
+    // conn-2 total = 60 + 100 = 160; conn-1 total = 20 + 50 = 70 -> conn-2 排第一
+    assert.equal(summary.connections[0].id, 'conn-2')
+    assert.equal(summary.connections[0].destination, 'discord.com:50001')
+    assert.equal(summary.connections[0].process, 'Discord.exe')
+    assert.equal(summary.connections[0].node, 'NodeHK')
+    assert.equal(summary.connections[0].upload, 60)
+    assert.equal(summary.connections[0].download, 100)
+    assert.equal(summary.connections[0].total, 160)
+    assert.equal(summary.connections[0].network, 'udp')
+
+    assert.equal(summary.connections[1].id, 'conn-1')
+    assert.equal(summary.connections[1].destination, 'api.github.com:443')
+    assert.equal(summary.connections[1].process, 'git.exe')
+    assert.equal(summary.connections[1].node, 'NodeUS')
+    assert.equal(summary.connections[1].upload, 20)
+    assert.equal(summary.connections[1].download, 50)
+    assert.equal(summary.connections[1].total, 70)
+  })
+
+  // 22. 进程（processes）与域名（hosts）维度聚合统计
+  it('22. 进程与域名维度聚合统计', () => {
+    const engine = new TrafficStatsEngine()
+    engine.feedSnapshot(
+      {
+        uploadTotal: 100,
+        downloadTotal: 100,
+        connections: [
+          {
+            id: 'c1',
+            upload: 10,
+            download: 10,
+            chains: ['Node1', 'Group1'],
+            metadata: {
+              host: 'example.com',
+              destinationPort: '443',
+              processPath: '/usr/bin/curl'
+            }
+          } as any,
+          {
+            id: 'c2',
+            upload: 10,
+            download: 10,
+            chains: ['Node1', 'Group1'],
+            metadata: {
+              host: 'example.com',
+              destinationPort: '443',
+              processPath: '/usr/bin/curl'
+            }
+          } as any
+        ]
+      },
+      baseTime
+    )
+
+    // c1 增量 30/70，c2 增量 20/30
+    engine.feedSnapshot(
+      {
+        uploadTotal: 150,
+        downloadTotal: 200,
+        connections: [
+          {
+            id: 'c1',
+            upload: 40,
+            download: 80,
+            chains: ['Node1', 'Group1'],
+            metadata: {
+              host: 'example.com',
+              destinationPort: '443',
+              processPath: '/usr/bin/curl'
+            }
+          } as any,
+          {
+            id: 'c2',
+            upload: 30,
+            download: 40,
+            chains: ['Node1', 'Group1'],
+            metadata: {
+              host: 'example.com',
+              destinationPort: '443',
+              processPath: '/usr/bin/curl'
+            }
+          } as any
+        ]
+      },
+      baseTime + 1000
+    )
+
+    const summary = engine.getSummary('today', baseTime + 1000)
+    // 两个连接属于同一个进程 curl 和同一个域名 example.com
+    assert.equal(summary.processes.length, 1)
+    assert.equal(summary.processes[0].name, 'curl')
+    assert.equal(summary.processes[0].upload, 50)
+    assert.equal(summary.processes[0].download, 100)
+    assert.equal(summary.processes[0].total, 150)
+
+    assert.equal(summary.hosts.length, 1)
+    assert.equal(summary.hosts[0].name, 'example.com')
+    assert.equal(summary.hosts[0].upload, 50)
+    assert.equal(summary.hosts[0].download, 100)
+    assert.equal(summary.hosts[0].total, 150)
+  })
+
+  // 23. 清空时连接维度和进程域名维度一并重置
+  it('23. 清空时连接维度和进程域名维度一并重置', () => {
+    const engine = new TrafficStatsEngine()
+    engine.feedSnapshot(
+      {
+        uploadTotal: 10,
+        downloadTotal: 10,
+        connections: [
+          {
+            id: 'c1',
+            upload: 10,
+            download: 10,
+            chains: ['Node1'],
+            metadata: { host: 'test.com', process: 'test' }
+          } as any
+        ]
+      },
+      baseTime
+    )
+    engine.feedSnapshot(
+      {
+        uploadTotal: 50,
+        downloadTotal: 50,
+        connections: [
+          {
+            id: 'c1',
+            upload: 50,
+            download: 50,
+            chains: ['Node1'],
+            metadata: { host: 'test.com', process: 'test' }
+          } as any
+        ]
+      },
+      baseTime + 1000
+    )
+
+    let summary = engine.getSummary('session', baseTime + 1000)
+    assert.equal(summary.connections.length, 1)
+    assert.equal(summary.processes.length, 1)
+    assert.equal(summary.hosts.length, 1)
+
+    engine.clear(baseTime + 2000)
+    summary = engine.getSummary('session', baseTime + 2000)
+    assert.equal(summary.connections.length, 0)
+    assert.equal(summary.processes.length, 0)
+    assert.equal(summary.hosts.length, 0)
+  })
 })
+
 
