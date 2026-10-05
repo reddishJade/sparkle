@@ -16,7 +16,9 @@ const latest = {
 if (process.env.SKIP_CHANGELOG !== '1') {
   changelog += '\n### 下载地址：\n\n#### Windows (x64)：\n\n'
   changelog += `- 便携版：[sparkle-windows-${version}-x64-portable.7z](${downloadUrl}/sparkle-windows-${version}-x64-portable.7z)\n`
-  changelog += `- 安装版：[sparkle-windows-${version}-x64-setup.exe](${downloadUrl}/sparkle-windows-${version}-x64-setup.exe)\n`
+  changelog += `- 安装版：[sparkle-windows-${version}-x64-setup.exe](${downloadUrl}/sparkle-windows-${version}-x64-setup.exe)\n\n`
+  changelog += '#### Linux (x64)：\n\n'
+  changelog += `- DEB 安装包：[sparkle-linux-${version}-amd64.deb](${downloadUrl}/sparkle-linux-${version}-amd64.deb)\n`
 }
 writeFileSync('latest.yml', yaml.stringify(latest))
 writeFileSync('changelog.md', changelog)
