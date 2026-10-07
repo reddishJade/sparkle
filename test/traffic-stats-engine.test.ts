@@ -878,9 +878,9 @@ describe('TrafficStatsEngine', () => {
     // 1. 启动建立基准
     engine.feedSnapshot({ uploadTotal: 100, downloadTotal: 200, connections: [] }, baseTime)
 
-    // 本次运行此时应该为 0
+    // 本次内核运行包含首次采样前内核已产生的流量
     let sessionSummary = engine.getSummary('session', baseTime)
-    assert.equal(sessionSummary.total, 0)
+    assert.equal(sessionSummary.total, 300)
     assert.equal(sessionSummary.nodes.length, 0)
 
     // 今日统计此时应包含历史的 1500 (500+1000)
@@ -907,9 +907,9 @@ describe('TrafficStatsEngine', () => {
     )
 
     sessionSummary = engine.getSummary('session', baseTime + 1000)
-    assert.equal(sessionSummary.totalUpload, 20)
-    assert.equal(sessionSummary.totalDownload, 40)
-    assert.equal(sessionSummary.total, 60)
+    assert.equal(sessionSummary.totalUpload, 120)
+    assert.equal(sessionSummary.totalDownload, 240)
+    assert.equal(sessionSummary.total, 360)
     assert.equal(sessionSummary.nodes.length, 1)
     assert.equal(sessionSummary.nodes[0].name, 'NodeA')
     assert.equal(sessionSummary.nodes[0].upload, 20)
@@ -946,11 +946,11 @@ describe('TrafficStatsEngine', () => {
     assert.equal(nextDaySummary.nodes.length, 1)
     assert.equal(nextDaySummary.nodes[0].name, 'NodeB')
 
-    // 但本次运行统计持续包含 NodeA (20/40) + NodeB (30/60) = 50 / 100 = 150
+    // 跨日仍包含内核初始累计量和 NodeA、NodeB 的后续增量
     sessionSummary = engine.getSummary('session', nextDayTime)
-    assert.equal(sessionSummary.totalUpload, 50)
-    assert.equal(sessionSummary.totalDownload, 100)
-    assert.equal(sessionSummary.total, 150)
+    assert.equal(sessionSummary.totalUpload, 150)
+    assert.equal(sessionSummary.totalDownload, 300)
+    assert.equal(sessionSummary.total, 450)
     assert.equal(sessionSummary.nodes.length, 2)
     const nodeA = sessionSummary.nodes.find((n) => n.name === 'NodeA')!
     const nodeB = sessionSummary.nodes.find((n) => n.name === 'NodeB')!

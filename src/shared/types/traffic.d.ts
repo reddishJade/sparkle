@@ -59,6 +59,7 @@ export interface TrafficStatsStorage {
   version: 1
   checkpoint: TrafficCheckpoint
   days: Record<string, DayTrafficStats>
+  session?: DayTrafficStats // 当前内核运行的统计，与 checkpoint 的内核实例绑定
 }
 
 export interface TrafficSummaryItem {

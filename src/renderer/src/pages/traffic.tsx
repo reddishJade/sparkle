@@ -51,7 +51,7 @@ type DisplayItem =
 
 const TrafficPage: React.FC = () => {
   const initialPrefs = useMemo(() => loadStoredPreferences(), [])
-  const [timeRange, setTimeRange] = useState<TrafficTimeRange>(initialPrefs.timeRange || 'today')
+  const [timeRange, setTimeRange] = useState<TrafficTimeRange>(initialPrefs.timeRange || 'session')
   const [dimension, setDimension] = useState<TrafficDimension>(initialPrefs.dimension || 'nodes')
   const [filter, setFilter] = useState('')
   const [sortBy, setSortBy] = useState<'total' | 'upload' | 'download'>(
@@ -339,8 +339,8 @@ const TrafficPage: React.FC = () => {
               </Select.Trigger>
               <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
                 <ListBox>
-                  <ListBox.Item key="session" id="session" textValue="本次运行">
-                    本次运行
+                  <ListBox.Item key="session" id="session" textValue="本次内核运行">
+                    本次内核运行
                     <ListBox.ItemIndicator />
                   </ListBox.Item>
                   <ListBox.Item key="today" id="today" textValue="今日">

@@ -26,7 +26,7 @@ const TrafficCard: React.FC<Props> = (props) => {
       if (loading) return
       loading = true
       try {
-        const stats = await getTrafficStats('today')
+        const stats = await getTrafficStats('session')
         if (!disposed) {
           setTraffic({ upload: stats.totalUpload, download: stats.totalDownload })
         }
@@ -115,7 +115,7 @@ const TrafficCard: React.FC<Props> = (props) => {
             </Button>
             {trafficCardStatus === 'col-span-2' && (
               <div
-                aria-label="今日累计流量"
+                aria-label="本次内核运行累计流量"
                 className={`p-2 w-full ${match ? 'text-primary-foreground' : 'text-foreground'}`}
               >
                 <div className="flex justify-between">

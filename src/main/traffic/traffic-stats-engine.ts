@@ -58,20 +58,25 @@ interface ActiveConnectionState {
 
 export class TrafficStatsEngine {
   private data: TrafficStatsStorage
-  private sessionStats: DayTrafficStats = {
-    day: 'session',
-    uploadTotal: 0,
-    downloadTotal: 0,
-    attributedUpload: 0,
-    attributedDownload: 0,
-    rawGlobalUpload: 0,
-    rawGlobalDownload: 0,
-    unknownUpload: 0,
-    unknownDownload: 0,
-    records: {},
-    connections: {},
-    processes: {},
-    hosts: {}
+  private sessionStats: DayTrafficStats = this.emptySession()
+  private hasSavedSession = false
+
+  private emptySession(): DayTrafficStats {
+    return {
+      day: 'session',
+      uploadTotal: 0,
+      downloadTotal: 0,
+      attributedUpload: 0,
+      attributedDownload: 0,
+      rawGlobalUpload: 0,
+      rawGlobalDownload: 0,
+      unknownUpload: 0,
+      unknownDownload: 0,
+      records: {},
+      connections: {},
+      processes: {},
+      hosts: {}
+    }
   }
   private activeConns = new Map<string, ActiveConnectionState>()
   private lastGlobalUp: number | null = null
@@ -97,6 +102,12 @@ export class TrafficStatsEngine {
           : undefined
       },
       days: initialData?.days ? { ...initialData.days } : {}
+    }
+
+    if (initialData?.session) {
+      this.hasSavedSession = true
+      this.sessionStats = structuredClone(initialData.session)
+      this.ensureDayStatsStructure(this.sessionStats)
     }
 
     // 兼容可能存在的旧存储结构字段初始化
@@ -132,7 +143,7 @@ export class TrafficStatsEngine {
   }
 
   public getRawData(): TrafficStatsStorage {
-    return this.data
+    return { ...this.data, session: this.sessionStats }
   }
 
   private pruneConnections(conns: Record<string, TrafficConnectionItem>, keepCount: number): void {
@@ -227,6 +238,14 @@ export class TrafficStatsEngine {
             ? savedInstanceId === coreInstanceId
             : true)
       )
+
+      if (!isSameInstance || !this.data.checkpoint.lastTimestamp) {
+        this.sessionStats = this.emptySession()
+      }
+      // 首次接入同一内核时也展示内核启动以来的累计量，而不是客户端启动以来的增量。
+      this.sessionStats.rawGlobalUpload += Math.max(0, snapshot.uploadTotal - (isSameInstance && this.hasSavedSession ? lastCoreUploadTotal : 0))
+      this.sessionStats.rawGlobalDownload += Math.max(0, snapshot.downloadTotal - (isSameInstance && this.hasSavedSession ? lastCoreDownloadTotal : 0))
+      this.recalculateTotals(this.sessionStats)
 
       if (isSameInstance) {
         const gapUp = Math.max(0, snapshot.uploadTotal - lastCoreUploadTotal)
@@ -330,6 +349,10 @@ export class TrafficStatsEngine {
       snapshot.downloadTotal < this.lastGlobalDown
 
     if (instanceChanged || countersReset) {
+      this.sessionStats = this.emptySession()
+      this.sessionStats.rawGlobalUpload = Math.max(0, snapshot.uploadTotal)
+      this.sessionStats.rawGlobalDownload = Math.max(0, snapshot.downloadTotal)
+      this.recalculateTotals(this.sessionStats)
       this.currentCoreInstanceId = coreInstanceId
       this.activeConns.clear()
       for (const conn of rawConns) {
@@ -799,21 +822,7 @@ export class TrafficStatsEngine {
 
   public clear(now: number = Date.now()): void {
     this.data.days = {}
-    this.sessionStats = {
-      day: 'session',
-      uploadTotal: 0,
-      downloadTotal: 0,
-      attributedUpload: 0,
-      attributedDownload: 0,
-      rawGlobalUpload: 0,
-      rawGlobalDownload: 0,
-      unknownUpload: 0,
-      unknownDownload: 0,
-      records: {},
-      connections: {},
-      processes: {},
-      hosts: {}
-    }
+    this.sessionStats = this.emptySession()
     this.data.checkpoint = {
       coreInstanceId: this.currentCoreInstanceId,
       lastCoreUploadTotal: this.lastGlobalUp ?? 0,
