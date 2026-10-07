@@ -1,6 +1,7 @@
 import { Button, Separator, ListBox, Select, InputGroup } from '@heroui/react'
 
 import BasePage from '@renderer/components/base/base-page'
+import QuickRuleProvider from '@renderer/components/rules/quick-rule-provider'
 import LogItem from '@renderer/components/logs/log-item'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
@@ -289,4 +290,10 @@ const Logs: React.FC = () => {
   )
 }
 
-export default Logs
+export default function LogsPage() {
+  return (
+    <QuickRuleProvider>
+      <Logs />
+    </QuickRuleProvider>
+  )
+}

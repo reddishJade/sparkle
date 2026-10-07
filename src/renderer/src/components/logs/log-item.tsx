@@ -1,4 +1,6 @@
 import { Card } from '@heroui/react'
+import { useQuickRuleMenu } from '../rules/quick-rule-provider'
+import { logRuleCandidates } from '@renderer/utils/quick-rule'
 
 import React, { useEffect, useState } from 'react'
 
@@ -18,6 +20,7 @@ interface Props extends ControllerLog {
 const LogItemComponent: React.FC<Props> = (props) => {
   const { type, payload, time, index, animateOnMount = false } = props
   const [entered, setEntered] = useState(!animateOnMount)
+  const openRuleMenu = useQuickRuleMenu()
 
   useEffect(() => {
     if (!animateOnMount) {
@@ -37,6 +40,7 @@ const LogItemComponent: React.FC<Props> = (props) => {
 
   return (
     <div
+      onContextMenu={(event) => openRuleMenu(event, logRuleCandidates(payload))}
       className={`px-2 pb-2 transition-[opacity,transform] duration-300 ease-out ${entered ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'} ${index === 0 ? 'pt-2' : ''}`}
     >
       <Card className={animateOnMount ? 'ring-1 ring-primary/12' : ''}>

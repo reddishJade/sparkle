@@ -1,5 +1,7 @@
 import { Button, Card, Chip, Avatar } from '@heroui/react'
 import { Pressable } from 'react-aria'
+import { useQuickRuleMenu } from '../rules/quick-rule-provider'
+import { connectionRuleCandidates } from '@renderer/utils/quick-rule'
 
 import { calcTraffic } from '@renderer/utils/calc'
 import dayjs from 'dayjs'
@@ -30,6 +32,7 @@ const ConnectionItemComponent: React.FC<Props> = ({
   setSelected,
   setIsDetailModalOpen
 }) => {
+  const openRuleMenu = useQuickRuleMenu()
   const fallbackProcessName = useMemo(
     () => info.metadata.process?.replace(/\.exe$/, '') || info.metadata.sourceIP,
     [info.metadata.process, info.metadata.sourceIP]
@@ -89,7 +92,11 @@ const ConnectionItemComponent: React.FC<Props> = ({
   }, [close, info.id])
 
   return (
-    <div className={`px-2 pb-1 ${index === 0 ? 'pt-1' : ''}`} style={{ minHeight: 68 }}>
+    <div
+      className={`px-2 pb-1 ${index === 0 ? 'pt-1' : ''}`}
+      style={{ minHeight: 68 }}
+      onContextMenu={(event) => openRuleMenu(event, connectionRuleCandidates(info.metadata))}
+    >
       <Pressable onPress={handleCardPress}>
         <Card className="w-full" data-pressable="true" role="button" tabIndex={0}>
           <div className="w-full flex justify-between items-center">

@@ -1,6 +1,7 @@
 import { Button, Badge, Tooltip, Separator, Select, Tabs, ListBox, InputGroup } from '@heroui/react'
 
 import BasePage from '@renderer/components/base/base-page'
+import QuickRuleProvider from '@renderer/components/rules/quick-rule-provider'
 import { mihomoCloseConnections, mihomoCloseConnection } from '@renderer/utils/ipc'
 import React, { Key, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -1321,4 +1322,10 @@ const Connections: React.FC = () => {
   )
 }
 
-export default Connections
+export default function ConnectionsPage() {
+  return (
+    <QuickRuleProvider>
+      <Connections />
+    </QuickRuleProvider>
+  )
+}
