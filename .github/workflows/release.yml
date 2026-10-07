@@ -256,6 +256,13 @@ jobs:
           tag: ${{ needs.prepare.outputs.tag }}
           deleteOnlyFromDrafts: false
 
+      - name: Update Release Tag
+        uses: richardsimko/update-tag@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
@@ -266,4 +273,5 @@ jobs:
           files: |
             latest.yml
             bin/dist/*
+          prerelease: false
           make_latest: true
