@@ -4,7 +4,7 @@ pkgver=1.26.7
 pkgrel=1
 pkgdesc="Another Mihomo GUI"
 arch=('x86_64' 'aarch64')
-url="https://github.com/xishang0128/sparkle"
+url="https://github.com/reddishJade/sparkle"
 license=('GPL-3.0-only')
 provides=("$_pkgname=$pkgver")
 conflicts=("$_pkgname" "$_pkgname-git" "$_pkgname-bin" "$_pkgname-rolling-bin" "$_pkgname-electron-bin" "$_pkgname-electron-git")

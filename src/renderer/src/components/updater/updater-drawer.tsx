@@ -82,7 +82,7 @@ const UpdaterDrawer: React.FC<Props> = (props) => {
 
   const isDownloading = updateStatus?.downloading || downloading
   const releaseTag = tag ?? (version.includes('-rolling-') ? 'rolling' : version)
-  const releaseUrl = `https://github.com/xishang0128/sparkle/releases/tag/${releaseTag}`
+  const releaseUrl = `https://github.com/reddishJade/sparkle/releases/tag/${releaseTag}`
   const releaseLink = !isDownloading && (
     <Link
       className={

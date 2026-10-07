@@ -35,7 +35,7 @@ const Settings: React.FC = () => {
             isIconOnly
             size="sm"
             onPress={() => {
-              window.open('https://github.com/xishang0128/sparkle')
+              window.open('https://github.com/reddishJade/sparkle')
             }}
             variant="ghost"
             data-color="default"
