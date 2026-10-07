@@ -258,7 +258,6 @@ const TrafficPage: React.FC = () => {
               data-color="primary"
               data-size="sm"
               data-full-width={false}
-              variant="secondary"
             >
               <Tabs.List aria-label="代理链路维度">
                 <Tabs.Tab key="nodes" id="nodes">
@@ -296,7 +295,7 @@ const TrafficPage: React.FC = () => {
 
             <Separator orientation="vertical" className="h-4 self-center bg-default-200 shrink-0" />
 
-            {/* 单元 2：连接、进程与域名 */}
+            {/* 单元 2：连接、域名与进程 */}
             <Tabs
               selectedKey={
                 dimension === 'connections' || dimension === 'processes' || dimension === 'hosts'
@@ -310,7 +309,6 @@ const TrafficPage: React.FC = () => {
               data-color="primary"
               data-size="sm"
               data-full-width={false}
-              variant="secondary"
             >
               <Tabs.List aria-label="网络流量维度">
                 <Tabs.Tab key="connections" id="connections">
@@ -328,21 +326,6 @@ const TrafficPage: React.FC = () => {
                   </Badge.Anchor>
                   <Tabs.Indicator />
                 </Tabs.Tab>
-                <Tabs.Tab key="processes" id="processes">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>进程</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'processes' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.processes.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
                 <Tabs.Tab key="hosts" id="hosts">
                   <Badge.Anchor className="items-center gap-0.5 leading-none">
                     <span>域名</span>
@@ -354,6 +337,21 @@ const TrafficPage: React.FC = () => {
                       data-shape="circle"
                     >
                       <Badge.Label>{stats?.hosts.length ?? 0}</Badge.Label>
+                    </Badge>
+                  </Badge.Anchor>
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+                <Tabs.Tab key="processes" id="processes">
+                  <Badge.Anchor className="items-center gap-0.5 leading-none">
+                    <span>进程</span>
+                    <Badge
+                      size="sm"
+                      data-color={dimension === 'processes' ? 'primary' : 'default'}
+                      variant="soft"
+                      data-outline={false}
+                      data-shape="circle"
+                    >
+                      <Badge.Label>{stats?.processes.length ?? 0}</Badge.Label>
                     </Badge>
                   </Badge.Anchor>
                   <Tabs.Indicator />
