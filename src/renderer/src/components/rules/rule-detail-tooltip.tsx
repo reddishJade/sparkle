@@ -10,6 +10,7 @@ dayjs.locale('zh-cn')
 
 interface Props {
   rule: ControllerRulesDetail
+  totalHitCount?: number
   anchorEl: HTMLElement | null
   visible: boolean
 }
@@ -19,7 +20,7 @@ const TOOLTIP_WIDTH = 228
 const isZeroTime = (at: string): boolean =>
   at.startsWith('0001-01-01') || at.startsWith('1970-01-01')
 
-const RuleDetailTooltip: React.FC<Props> = ({ rule, anchorEl, visible }) => {
+const RuleDetailTooltip: React.FC<Props> = ({ rule, totalHitCount = 0, anchorEl, visible }) => {
   const [pos, setPos] = useState<{ top: number; left: number; side: 'left' | 'right' } | null>(null)
   const [finalTop, setFinalTop] = useState<number | null>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -57,8 +58,11 @@ const RuleDetailTooltip: React.FC<Props> = ({ rule, anchorEl, visible }) => {
   const arrowTop = Math.max(10, Math.min(anchorMidRelative - 6, tooltipH - 22))
 
   const { hitCount, hitAt, missCount, missAt } = rule.extra
-  const totalCount = hitCount + missCount
-  const hitRate = totalCount > 0 ? (hitCount / totalCount) * 100 : 0
+  const evaluatedCount = hitCount + missCount
+  const hasGlobalStats = Boolean(totalHitCount > 0 && hitCount > 0)
+  const globalRatio = hasGlobalStats ? (hitCount / totalHitCount) * 100 : 0
+  const globalRatioText =
+    globalRatio >= 0.1 ? `${globalRatio.toFixed(1)}%` : globalRatio > 0 ? '<0.1%' : '0%'
 
   return createPortal(
     <div
@@ -114,16 +118,35 @@ const RuleDetailTooltip: React.FC<Props> = ({ rule, anchorEl, visible }) => {
             </>
           )}
 
-          {totalCount > 0 ? (
+          {evaluatedCount > 0 ? (
             <>
-              <span className="text-[10px] text-muted">命中率</span>
-              <span className="text-[10px] text-muted justify-self-end">{hitRate.toFixed(1)}%</span>
+              {hasGlobalStats && (
+                <>
+                  <span className="text-[10px] text-muted">分流占比</span>
+                  <span className="text-[10px] text-muted justify-self-end font-medium">
+                    {globalRatioText}
+                  </span>
+                </>
+              )}
 
               <span className="text-[10px] text-muted">命中次数</span>
-              <span className="text-[10px] text-muted justify-self-end">{hitCount}</span>
+              <span className="text-[10px] text-muted justify-self-end">
+                {hitCount.toLocaleString()}
+              </span>
 
-              <span className="text-[10px] text-muted">总次数</span>
-              <span className="text-[10px] text-muted justify-self-end">{totalCount}</span>
+              {totalHitCount > 0 && (
+                <>
+                  <span className="text-[10px] text-muted">总连接数</span>
+                  <span className="text-[10px] text-muted justify-self-end">
+                    {totalHitCount.toLocaleString()}
+                  </span>
+                </>
+              )}
+
+              <span className="text-[10px] text-muted">到达评估</span>
+              <span className="text-[10px] text-muted justify-self-end">
+                {evaluatedCount.toLocaleString()}
+              </span>
 
               {!isZeroTime(hitAt) && (
                 <>

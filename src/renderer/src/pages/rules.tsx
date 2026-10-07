@@ -23,6 +23,11 @@ const Rules: React.FC = () => {
     })
   }, [rules, filter])
 
+  const totalHitCount = useMemo(() => {
+    if (!rules?.rules) return 0
+    return rules.rules.reduce((acc, r) => acc + (r.extra?.hitCount || 0), 0)
+  }, [rules])
+
   return (
     <BasePage title="分流规则">
       <div className="sticky top-0 z-40">
@@ -59,7 +64,10 @@ const Rules: React.FC = () => {
       <div className="h-[calc(100vh-100px)] mt-px">
         <Virtuoso
           data={filteredRules}
-          itemContent={(i, rule) => <RuleItem index={i} rule={rule} />}
+          context={{ totalHitCount }}
+          itemContent={(i, rule, context) => (
+            <RuleItem index={i} rule={rule} totalHitCount={context.totalHitCount} />
+          )}
         />
       </div>
     </BasePage>

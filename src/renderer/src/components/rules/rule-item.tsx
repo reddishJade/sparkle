@@ -14,20 +14,21 @@ dayjs.locale('zh-cn')
 interface Props {
   index: number
   rule: ControllerRulesDetail
+  totalHitCount?: number
 }
 
-const RuleItem: React.FC<Props> = ({ rule, index }) => {
+const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
   const [isEnabled, setIsEnabled] = useState(!rule.extra.disabled)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [showTooltip, setShowTooltip] = useState(false)
 
-  const { hitCount, missCount } = rule.extra
+  const { hitCount } = rule.extra
 
-  const totalCount = hitCount + missCount
-  const hitRate = totalCount > 0 ? (hitCount / totalCount) * 100 : 0
-
-  const hasStats = totalCount > 0
+  const hasStats = Boolean(hitCount > 0 && totalHitCount > 0)
+  const hitRatio = hasStats ? (hitCount / totalHitCount) * 100 : 0
+  const hitRatioText =
+    hitRatio >= 0.1 ? `${hitRatio.toFixed(1)}%` : hitRatio > 0 ? '<0.1%' : '0%'
 
   useEffect(() => {
     setIsEnabled(!rule.extra.disabled)
@@ -99,7 +100,7 @@ const RuleItem: React.FC<Props> = ({ rule, index }) => {
                   variant="soft"
                   className={['text-xs'].filter(Boolean).join(' ')}
                 >
-                  <Chip.Label>{hitRate.toFixed(1)}%</Chip.Label>
+                  <Chip.Label>{hitRatioText}</Chip.Label>
                 </Chip>
               </div>
             )}
@@ -108,6 +109,7 @@ const RuleItem: React.FC<Props> = ({ rule, index }) => {
       </Card>
       <RuleDetailTooltip
         rule={rule}
+        totalHitCount={totalHitCount}
         anchorEl={showTooltip ? wrapperRef.current : null}
         visible={showTooltip}
       />
