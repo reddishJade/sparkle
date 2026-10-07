@@ -33,22 +33,6 @@ export function taskDir(): string {
   return dir
 }
 
-export function subStoreDir(): string {
-  return path.join(dataDir(), 'substore')
-}
-
-export function subStoreFrontendDir(): string {
-  return path.join(subStoreDir(), 'sub-store-frontend')
-}
-
-export function subStoreBackendPath(): string {
-  return path.join(subStoreDir(), 'sub-store.bundle.js')
-}
-
-export function subStoreTempDir(): string {
-  return path.join(subStoreDir(), 'temp')
-}
-
 export function exeDir(): string {
   return path.dirname(exePath())
 }
@@ -212,10 +196,6 @@ export function appLogPath(): string {
 
 export function coreLogPath(): string {
   return datedLogPath('core')
-}
-
-export function substoreLogPath(): string {
-  return datedLogPath('sub-store')
 }
 
 function hasCommand(command: string): boolean {

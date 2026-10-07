@@ -22,8 +22,8 @@ const emptyArray: string[] = []
 const AdvancedSettings: React.FC = () => {
   const { appConfig, patchAppConfig } = useAppConfig()
   const {
-    controlDns = true,
-    controlSniff = true,
+    controlDns = false,
+    controlSniff = false,
     pauseSSID,
     autoLightweight = false,
     autoLightweightDelay = 60,

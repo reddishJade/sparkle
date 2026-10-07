@@ -18,7 +18,7 @@ const SniffCard: React.FC<Props> = (props) => {
   const { iconOnly } = props
   const {
     sniffCardStatus = 'col-span-1',
-    controlSniff = true,
+    controlSniff = false,
     disableAnimation = false
   } = appConfig || {}
   const location = useLocation()

@@ -34,7 +34,7 @@ export async function generateProfile(): Promise<void> {
     getControledMihomoConfig()
   ])
   const { current } = profileConfig
-  const { diffWorkDir = false, controlDns = true, controlSniff = true } = appConfig
+  const { diffWorkDir = false, controlDns = false, controlSniff = false } = appConfig
   const nextRawProfileStr = await getProfileStr(current)
   let currentProfileConfig = parseYaml<MihomoConfig>(nextRawProfileStr)
   if (typeof currentProfileConfig !== 'object') currentProfileConfig = {} as MihomoConfig

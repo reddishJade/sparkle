@@ -52,15 +52,6 @@ import {
   setOverride,
   updateOverrideItem
 } from '../config'
-import {
-  startSubStoreFrontendServer,
-  startSubStoreBackendServer,
-  stopSubStoreFrontendServer,
-  stopSubStoreBackendServer,
-  downloadSubStore,
-  subStoreFrontendPort,
-  subStorePort
-} from '../resolve/server'
 import { quitWithoutCore, restartCore, startNetworkDetection, stopCore } from '../core/manager'
 import { stopNetworkDetection } from '../core/network'
 import {
@@ -102,7 +93,6 @@ import {
   getCurrentProfileStr,
   getOverrideProfileStr
 } from '../core/factory'
-import { listWebdavBackups, webdavBackup, webdavDelete, webdavRestore } from '../resolve/backup'
 import { getInterfaces } from '../sys/interface'
 import {
   closeTrayIcon,
@@ -127,7 +117,6 @@ import {
   resolveThemes,
   writeTheme
 } from '../resolve/theme'
-import { subStoreCollections, subStoreSubs } from '../core/subStoreApi'
 import path from 'path'
 import v8 from 'v8'
 import { getGistUrl } from '../resolve/gistApi'
@@ -354,25 +343,9 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('openUWPTool', ipcErrorWrapper(openUWPTool))
   ipcMain.handle('setupFirewall', ipcErrorWrapper(setupFirewall))
   ipcMain.handle('getInterfaces', getInterfaces)
-  ipcMain.handle('webdavBackup', ipcErrorWrapper(webdavBackup))
-  ipcMain.handle('webdavRestore', (_e, filename) => ipcErrorWrapper(webdavRestore)(filename))
-  ipcMain.handle('listWebdavBackups', ipcErrorWrapper(listWebdavBackups))
-  ipcMain.handle('webdavDelete', (_e, filename) => ipcErrorWrapper(webdavDelete)(filename))
   ipcMain.handle('registerShortcut', (_e, oldShortcut, newShortcut, action) =>
     ipcErrorWrapper(registerShortcut)(oldShortcut, newShortcut, action)
   )
-  ipcMain.handle('startSubStoreFrontendServer', () =>
-    ipcErrorWrapper(startSubStoreFrontendServer)()
-  )
-  ipcMain.handle('stopSubStoreFrontendServer', () => ipcErrorWrapper(stopSubStoreFrontendServer)())
-  ipcMain.handle('startSubStoreBackendServer', () => ipcErrorWrapper(startSubStoreBackendServer)())
-  ipcMain.handle('stopSubStoreBackendServer', () => ipcErrorWrapper(stopSubStoreBackendServer)())
-  ipcMain.handle('downloadSubStore', () => ipcErrorWrapper(downloadSubStore)())
-
-  ipcMain.handle('subStorePort', () => subStorePort)
-  ipcMain.handle('subStoreFrontendPort', () => subStoreFrontendPort)
-  ipcMain.handle('subStoreSubs', () => ipcErrorWrapper(subStoreSubs)())
-  ipcMain.handle('subStoreCollections', () => ipcErrorWrapper(subStoreCollections)())
   ipcMain.handle('getGistUrl', ipcErrorWrapper(getGistUrl))
   ipcMain.handle('setNativeTheme', (_e, theme) => {
     setNativeTheme(theme)
@@ -442,7 +415,5 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('getTrafficStats', (_e, range) =>
     ipcErrorWrapper(() => trafficStatsService.getSummary(range))()
   )
-  ipcMain.handle('clearTrafficStats', () =>
-    ipcErrorWrapper(() => trafficStatsService.clear())()
-  )
+  ipcMain.handle('clearTrafficStats', () => ipcErrorWrapper(() => trafficStatsService.clear())())
 }

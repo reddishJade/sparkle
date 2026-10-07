@@ -21,7 +21,6 @@ import ProxyCard from './proxy-card'
 import ResourceCard from './resource-card'
 import RuleCard from './rule-card'
 import SniffCard from './sniff-card'
-import SubStoreCard from './substore-card'
 import TrafficCard from './traffic-card'
 import SysproxySwitcher from './sysproxy-switcher'
 import TunSwitcher from './tun-switcher'
@@ -55,8 +54,7 @@ const defaultSiderOrder = [
   'rule',
   'resource',
   'override',
-  'log',
-  'substore'
+  'log'
 ]
 
 const siderCardRouteMap = {
@@ -72,8 +70,7 @@ const siderCardRouteMap = {
   'log-card': '/logs',
   'rule-card': '/rules',
   'resource-card': '/resources',
-  'override-card': '/override',
-  'substore-card': '/substore'
+  'override-card': '/override'
 } as const
 
 const siderCardSelector = Object.keys(siderCardRouteMap)
@@ -93,8 +90,7 @@ const componentMap = {
   log: LogCard,
   rule: RuleCard,
   resource: ResourceCard,
-  override: OverrideCard,
-  substore: SubStoreCard
+  override: OverrideCard
 }
 
 interface Props {
@@ -104,7 +100,7 @@ interface Props {
 export default function SiderCards({ iconOnly = false }: Props): React.JSX.Element {
   const { appConfig, patchAppConfig } = useAppConfig()
   const siderOrder = useMemo(() => {
-    const raw = appConfig?.siderOrder ?? defaultSiderOrder
+    const raw = (appConfig?.siderOrder ?? defaultSiderOrder).filter((id) => id in componentMap)
     const missing = defaultSiderOrder.filter((id) => !raw.includes(id))
     return missing.length > 0 ? [...raw, ...missing] : raw
   }, [appConfig?.siderOrder])

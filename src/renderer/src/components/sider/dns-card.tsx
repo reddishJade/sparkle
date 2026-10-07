@@ -18,7 +18,7 @@ const DNSCard: React.FC<Props> = (props) => {
   const { iconOnly } = props
   const {
     dnsCardStatus = 'col-span-1',
-    controlDns = true,
+    controlDns = false,
     disableAnimation = false
   } = appConfig || {}
   const location = useLocation()

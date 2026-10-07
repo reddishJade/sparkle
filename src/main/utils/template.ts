@@ -31,13 +31,12 @@ export const defaultConfig: AppConfig = {
   connectionMaxClosed: 1000,
   gistSyncEnabled: false,
   gistEncrypted: false,
-  useSubStore: true,
   proxyDisplayOrder: 'default',
   autoCheckUpdate: false,
   autoCloseConnection: true,
   closeMode: 'all',
-  controlDns: true,
-  controlSniff: true,
+  controlDns: false,
+  controlSniff: false,
   hosts: [],
   siderOrder: [
     'sysproxy',
@@ -51,8 +50,7 @@ export const defaultConfig: AppConfig = {
     'rule',
     'resource',
     'override',
-    'log',
-    'substore'
+    'log'
   ],
   siderWidth: 250,
   sysProxy: { enable: false, mode: 'manual', guard: false, guardNotify: false },
@@ -170,10 +168,10 @@ export const defaultControledMihomoConfig: Partial<MihomoConfig> = {
   'geo-update-interval': 24,
   'geodata-mode': false,
   'geox-url': {
-    geoip: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat',
-    geosite: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat',
-    mmdb: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.metadb',
-    asn: 'https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/GeoLite2-ASN.mmdb'
+    geoip: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.dat',
+    geosite: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
+    mmdb: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
+    asn: 'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb'
   }
 }
 
