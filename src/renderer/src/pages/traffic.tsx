@@ -3,7 +3,7 @@ import { Button, Card, Chip, InputGroup, ListBox, Select, Separator, Tooltip } f
 import { Virtuoso } from 'react-virtuoso'
 import BasePage from '@renderer/components/base/base-page'
 import ConfirmModal from '@renderer/components/base/base-confirm'
-import { calcTraffic } from '@renderer/utils/calc'
+import { calcTrafficTotal as calcTraffic } from '@renderer/utils/calc'
 import { clearTrafficStats, getTrafficStats } from '@renderer/utils/ipc'
 import type {
   TrafficConnectionItem,

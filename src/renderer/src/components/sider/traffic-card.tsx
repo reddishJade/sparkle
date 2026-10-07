@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import React, { useEffect, useState } from 'react'
 import { FaCircleArrowDown, FaCircleArrowUp } from 'react-icons/fa6'
-import { calcTraffic } from '@renderer/utils/calc'
+import { calcTrafficTotal as calcTraffic } from '@renderer/utils/calc'
 import { getTrafficStats } from '@renderer/utils/ipc'
 
 interface Props {

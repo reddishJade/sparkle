@@ -18,6 +18,14 @@ export function calcTraffic(byte: number): string {
   return `${formatNumString(byte)} YB`
 }
 
+// 流量统计固定使用 KB / MB / GB，避免小流量显示 B、大流量跳到 TB。
+export function calcTrafficTotal(bytes: number): string {
+  const value = Math.max(0, Number.isFinite(bytes) ? bytes : 0)
+  if (value < 1024 ** 2) return `${formatNumString(value / 1024)} KB`
+  if (value < 1024 ** 3) return `${formatNumString(value / 1024 ** 2)} MB`
+  return `${formatNumString(value / 1024 ** 3)} GB`
+}
+
 function formatNumString(num: number): string {
   let str = num.toFixed(2)
   if (str.length <= 5) return str
