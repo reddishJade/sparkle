@@ -1,16 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Badge,
-  Button,
-  Card,
-  Chip,
-  InputGroup,
-  ListBox,
-  Select,
-  Separator,
-  Tabs,
-  Tooltip
-} from '@heroui/react'
+import { Button, Card, Chip, InputGroup, ListBox, Select, Separator, Tooltip } from '@heroui/react'
 import { Virtuoso } from 'react-virtuoso'
 import BasePage from '@renderer/components/base/base-page'
 import ConfirmModal from '@renderer/components/base/base-confirm'
@@ -100,7 +89,7 @@ const TrafficPage: React.FC = () => {
     void loadData()
     const timer = setInterval(() => {
       void loadData()
-    }, 2500)
+    }, 1000)
     return () => clearInterval(timer)
   }, [loadData])
 
@@ -248,116 +237,71 @@ const TrafficPage: React.FC = () => {
         {/* 控制工具栏：与 Connections 页面 100% 结构和尺寸对齐 */}
         <div className="overflow-x-auto sticky top-0 z-40">
           <div className="flex p-2 gap-2">
-            {/* 单元 1：代理与策略组 */}
-            <Tabs
-              selectedKey={dimension === 'nodes' || dimension === 'groups' ? dimension : ''}
-              onSelectionChange={(key) => {
-                if (key) setDimension(key as TrafficDimension)
-              }}
-              className="connection-tabs w-fit h-8 shrink-0"
-              data-color="primary"
+            {/* 单元 1：节点与策略组 */}
+            <Select
+              aria-label="代理链路维度"
+              placeholder="节点 / 策略组"
+              className="w-36 shrink-0"
               data-size="sm"
-              data-full-width={false}
+              value={dimension === 'nodes' || dimension === 'groups' ? dimension : null}
+              onChange={(value) => {
+                if (value) setDimension(value as TrafficDimension)
+              }}
             >
-              <Tabs.List aria-label="代理链路维度">
-                <Tabs.Tab key="nodes" id="nodes">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>节点</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'nodes' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.nodes.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-                <Tabs.Tab key="groups" id="groups">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>策略组</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'groups' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.groups.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
-
-            <Separator orientation="vertical" className="h-4 self-center bg-default-200 shrink-0" />
+              <Select.Trigger className="data-[hover=true]:bg-default-200">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
+                <ListBox>
+                  <ListBox.Item key="nodes" id="nodes" textValue="节点">
+                    节点
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                  <ListBox.Item key="groups" id="groups" textValue="策略组">
+                    策略组
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                </ListBox>
+              </Select.Popover>
+            </Select>
 
             {/* 单元 2：连接、域名与进程 */}
-            <Tabs
-              selectedKey={
-                dimension === 'connections' || dimension === 'processes' || dimension === 'hosts'
-                  ? dimension
-                  : ''
-              }
-              onSelectionChange={(key) => {
-                if (key) setDimension(key as TrafficDimension)
-              }}
-              className="connection-tabs w-fit h-8 shrink-0"
-              data-color="primary"
+            <Select
+              aria-label="网络流量维度"
+              placeholder="连接 / 域名 / 进程"
+              className="w-40 shrink-0"
               data-size="sm"
-              data-full-width={false}
+              value={
+                dimension === 'connections' || dimension === 'hosts' || dimension === 'processes'
+                  ? dimension
+                  : null
+              }
+              onChange={(value) => {
+                if (value) setDimension(value as TrafficDimension)
+              }}
             >
-              <Tabs.List aria-label="网络流量维度">
-                <Tabs.Tab key="connections" id="connections">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>连接</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'connections' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.connections.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-                <Tabs.Tab key="hosts" id="hosts">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>域名</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'hosts' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.hosts.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-                <Tabs.Tab key="processes" id="processes">
-                  <Badge.Anchor className="items-center gap-0.5 leading-none">
-                    <span>进程</span>
-                    <Badge
-                      size="sm"
-                      data-color={dimension === 'processes' ? 'primary' : 'default'}
-                      variant="soft"
-                      data-outline={false}
-                      data-shape="circle"
-                    >
-                      <Badge.Label>{stats?.processes.length ?? 0}</Badge.Label>
-                    </Badge>
-                  </Badge.Anchor>
-                  <Tabs.Indicator />
-                </Tabs.Tab>
-              </Tabs.List>
-            </Tabs>
+              <Select.Trigger className="data-[hover=true]:bg-default-200">
+                <Select.Value />
+                <Select.Indicator />
+              </Select.Trigger>
+              <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
+                <ListBox>
+                  <ListBox.Item key="connections" id="connections" textValue="连接">
+                    连接
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                  <ListBox.Item key="hosts" id="hosts" textValue="域名">
+                    域名
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                  <ListBox.Item key="processes" id="processes" textValue="进程">
+                    进程
+                    <ListBox.ItemIndicator />
+                  </ListBox.Item>
+                </ListBox>
+              </Select.Popover>
+            </Select>
 
             <InputGroup fullWidth className="relative h-8 px-3">
               <InputGroup.Input

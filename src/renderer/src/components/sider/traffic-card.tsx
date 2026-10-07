@@ -4,7 +4,10 @@ import { CSS } from '@dnd-kit/utilities'
 import { IoStatsChart } from 'react-icons/io5'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import { FaCircleArrowDown, FaCircleArrowUp } from 'react-icons/fa6'
+import { calcTraffic } from '@renderer/utils/calc'
+import { getTrafficStats } from '@renderer/utils/ipc'
 
 interface Props {
   iconOnly?: boolean
@@ -13,6 +16,33 @@ interface Props {
 const TrafficCard: React.FC<Props> = (props) => {
   const { appConfig } = useAppConfig()
   const { iconOnly } = props
+  const [traffic, setTraffic] = useState({ upload: 0, download: 0 })
+
+  useEffect(() => {
+    if (iconOnly) return
+    let disposed = false
+    let loading = false
+    const refresh = async (): Promise<void> => {
+      if (loading) return
+      loading = true
+      try {
+        const stats = await getTrafficStats('today')
+        if (!disposed) {
+          setTraffic({ upload: stats.totalUpload, download: stats.totalDownload })
+        }
+      } catch {
+        // 保留上一次统计，等待下一次刷新
+      } finally {
+        loading = false
+      }
+    }
+    void refresh()
+    const timer = setInterval(() => void refresh(), 1000)
+    return () => {
+      disposed = true
+      clearInterval(timer)
+    }
+  }, [iconOnly])
   const { trafficCardStatus = 'col-span-2', disableAnimation = false } = appConfig || {}
   const location = useLocation()
   const navigate = useNavigate()
@@ -83,6 +113,21 @@ const TrafficCard: React.FC<Props> = (props) => {
                 className={`${match ? 'text-primary-foreground' : 'text-foreground'} text-[24px] font-bold`}
               />
             </Button>
+            {trafficCardStatus === 'col-span-2' && (
+              <div
+                aria-label="今日累计流量"
+                className={`p-2 w-full ${match ? 'text-primary-foreground' : 'text-foreground'}`}
+              >
+                <div className="flex justify-between">
+                  <div className="w-full text-right mr-2">{calcTraffic(traffic.upload)}</div>
+                  <FaCircleArrowUp aria-label="上传" className="h-6 leading-6" />
+                </div>
+                <div className="flex justify-between">
+                  <div className="w-full text-right mr-2">{calcTraffic(traffic.download)}</div>
+                  <FaCircleArrowDown aria-label="下载" className="h-6 leading-6" />
+                </div>
+              </div>
+            )}
           </div>
         </Card.Content>
         <Card.Footer className="pt-1">
