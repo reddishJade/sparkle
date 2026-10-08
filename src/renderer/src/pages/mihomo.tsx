@@ -13,6 +13,8 @@ import { IoMdCloudDownload } from 'react-icons/io'
 import PubSub from 'pubsub-js'
 import {
   manualGrantCorePermition,
+  mihomoFlushDns,
+  mihomoFlushFakeIp,
   mihomoUpgrade,
   restartCore,
   revokeCorePermission,
@@ -68,6 +70,7 @@ const Mihomo: React.FC = () => {
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
   const { ipv6 } = controledMihomoConfig || {}
 
+  const [clearingCache, setClearingCache] = useState<'dns' | 'fake-ip' | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [showPermissionModal, setShowPermissionModal] = useState(false)
   const [showServiceModal, setShowServiceModal] = useState(false)
@@ -95,6 +98,23 @@ const Mihomo: React.FC = () => {
       PubSub.publish('mihomo-core-changed')
     } catch (e) {
       notify(e, { variant: 'danger' })
+    }
+  }
+
+  const handleClearCache = async (type: 'dns' | 'fake-ip'): Promise<void> => {
+    if (clearingCache) return
+    setClearingCache(type)
+    try {
+      if (type === 'dns') {
+        await mihomoFlushDns()
+      } else {
+        await mihomoFlushFakeIp()
+      }
+      notify(type === 'dns' ? 'DNS 缓存已清空' : 'Fake IP 映射已清空')
+    } catch (e) {
+      notify(e, { variant: 'danger' })
+    } finally {
+      setClearingCache(null)
     }
   }
 
@@ -443,6 +463,34 @@ const Mihomo: React.FC = () => {
       <ControllerSetting />
       <EnvSetting />
       <LogSetting />
+      <SettingCard header="缓存维护">
+        <p className="text-sm text-default-500 mb-3">
+          仅清理当前运行内核的缓存，不影响系统 DNS 缓存，无需重启内核。
+        </p>
+        <SettingItem compatKey="legacy" title="DNS 缓存" divider>
+          <Button
+            size="sm"
+            isDisabled={clearingCache !== null}
+            onPress={() => handleClearCache('dns')}
+          >
+            {clearingCache === 'dns' && <Spinner size="sm" />}
+            清空 DNS 缓存
+          </Button>
+        </SettingItem>
+        <SettingItem compatKey="legacy" title="Fake IP 映射">
+          <Button
+            size="sm"
+            isDisabled={clearingCache !== null}
+            onPress={() => handleClearCache('fake-ip')}
+          >
+            {clearingCache === 'fake-ip' && <Spinner size="sm" />}
+            清空 Fake IP
+          </Button>
+        </SettingItem>
+        <p className="text-sm text-default-500 mt-3">
+          清空 Fake IP 后，客户端可能需要重新解析域名才能恢复访问。
+        </p>
+      </SettingCard>
       <AdvancedSetting />
     </BasePage>
   )

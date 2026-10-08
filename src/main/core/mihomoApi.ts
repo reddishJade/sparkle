@@ -103,6 +103,16 @@ export const patchMihomoConfig = async (patch: Partial<ControllerConfigs>): Prom
   return await instance.patch('/configs', patch)
 }
 
+export const mihomoFlushDns = async (): Promise<void> => {
+  const instance = await getAxios()
+  await instance.post('/cache/dns/flush')
+}
+
+export const mihomoFlushFakeIp = async (): Promise<void> => {
+  const instance = await getAxios()
+  await instance.post('/cache/fakeip/flush')
+}
+
 export const mihomoCloseConnection = async (id: string): Promise<void> => {
   const instance = await getAxios()
   return await instance.delete(`/connections/${encodeURIComponent(id)}`)

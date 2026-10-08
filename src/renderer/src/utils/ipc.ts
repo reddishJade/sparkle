@@ -18,6 +18,14 @@ export async function mihomoConfig(): Promise<ControllerConfigs> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoConfig'))
 }
 
+export async function mihomoFlushDns(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoFlushDns'))
+}
+
+export async function mihomoFlushFakeIp(): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoFlushFakeIp'))
+}
+
 export async function mihomoCloseConnection(id: string): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('mihomoCloseConnection', id))
 }
