@@ -1,4 +1,5 @@
 import os from 'os'
+import { defaultGeoxUrl } from '../../shared/geo'
 import { systemCoreDefaultPath, systemCoreOnlyBuild } from '../../shared/build-flags'
 
 export const defaultConfig: AppConfig = {
@@ -167,12 +168,7 @@ export const defaultControledMihomoConfig: Partial<MihomoConfig> = {
   'geo-auto-update': false,
   'geo-update-interval': 24,
   'geodata-mode': false,
-  'geox-url': {
-    geoip: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.dat',
-    geosite: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
-    mmdb: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
-    asn: 'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb'
-  }
+  'geox-url': defaultGeoxUrl
 }
 
 export const defaultProfileConfig: ProfileConfig = {

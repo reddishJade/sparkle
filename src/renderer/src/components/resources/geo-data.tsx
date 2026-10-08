@@ -8,12 +8,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { IoMdRefresh } from 'react-icons/io'
 import { notify } from '@renderer/utils/notification'
 
-const defaultGeoxUrl = {
-  geoip: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.dat',
-  geosite: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geosite.dat',
-  mmdb: 'https://github.com/appshubcc/bett-rules/releases/download/latest/geoip.metadb',
-  asn: 'https://github.com/appshubcc/bett-rules/releases/download/latest/GeoLite2-ASN.mmdb'
-}
+import { defaultGeoxUrl } from '../../../../shared/geo'
 
 const GeoData: React.FC = () => {
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()

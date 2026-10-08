@@ -37,6 +37,7 @@ import { startSSIDCheck } from '../sys/ssid'
 import { startNetworkDetection } from '../core/manager'
 import { initKeyManager } from '../service/manager'
 import { appendAppLog } from './log'
+import { migrateGeoxUrl } from '../../shared/geo'
 
 async function initDirs(): Promise<void> {
   if (!existsSync(dataDir())) {
@@ -143,6 +144,10 @@ async function migration(): Promise<void> {
   const [appConfig, mihomoConfig] = await Promise.all([getAppConfig(), getControledMihomoConfig()])
 
   const mihomoConfigPatch: Partial<MihomoConfig> = {}
+  const migratedGeoxUrl = migrateGeoxUrl(mihomoConfig['geox-url'])
+  if (migratedGeoxUrl) {
+    mihomoConfigPatch['geox-url'] = migratedGeoxUrl
+  }
 
   for (const key in defaultControledMihomoConfig) {
     if (
