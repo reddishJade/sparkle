@@ -445,7 +445,7 @@ const Mihomo: React.FC = () => {
             管理
           </Button>
         </SettingItem>
-        <SettingItem compatKey="legacy" title="IPv6">
+        <SettingItem compatKey="legacy" title="IPv6" divider>
           <Switch
             size="sm"
             isSelected={ipv6}
@@ -459,12 +459,6 @@ const Mihomo: React.FC = () => {
             </Switch.Content>
           </Switch>
         </SettingItem>
-      </SettingCard>
-      <PortSetting />
-      <ControllerSetting />
-      <EnvSetting />
-      <LogSetting />
-      <SettingCard>
         <SettingItem compatKey="legacy" title="清空 DNS 缓存" divider>
           <Button
             size="sm"
@@ -492,6 +486,10 @@ const Mihomo: React.FC = () => {
           </Button>
         </SettingItem>
       </SettingCard>
+      <PortSetting />
+      <ControllerSetting />
+      <EnvSetting />
+      <LogSetting />
       <AdvancedSetting />
     </BasePage>
   )
