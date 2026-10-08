@@ -10,6 +10,7 @@ import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-c
 import PortSetting from '@renderer/components/mihomo/port-setting'
 import { platform } from '@renderer/utils/init'
 import { IoMdCloudDownload } from 'react-icons/io'
+import { CgTrash } from 'react-icons/cg'
 import PubSub from 'pubsub-js'
 import {
   manualGrantCorePermition,
@@ -463,33 +464,33 @@ const Mihomo: React.FC = () => {
       <ControllerSetting />
       <EnvSetting />
       <LogSetting />
-      <SettingCard header="缓存维护">
-        <p className="text-sm text-default-500 mb-3">
-          仅清理当前运行内核的缓存，不影响系统 DNS 缓存，无需重启内核。
-        </p>
-        <SettingItem compatKey="legacy" title="DNS 缓存" divider>
+      <SettingCard>
+        <SettingItem compatKey="legacy" title="清空 DNS 缓存" divider>
           <Button
             size="sm"
+            isIconOnly
+            variant="ghost"
+            data-color="danger"
+            aria-label="清空 DNS 缓存"
             isDisabled={clearingCache !== null}
             onPress={() => handleClearCache('dns')}
           >
-            {clearingCache === 'dns' && <Spinner size="sm" />}
-            清空 DNS 缓存
+            <CgTrash className="text-lg" />
           </Button>
         </SettingItem>
-        <SettingItem compatKey="legacy" title="Fake IP 映射">
+        <SettingItem compatKey="legacy" title="清空 Fake IP">
           <Button
             size="sm"
+            isIconOnly
+            variant="ghost"
+            data-color="danger"
+            aria-label="清空 Fake IP"
             isDisabled={clearingCache !== null}
             onPress={() => handleClearCache('fake-ip')}
           >
-            {clearingCache === 'fake-ip' && <Spinner size="sm" />}
-            清空 Fake IP
+            <CgTrash className="text-lg" />
           </Button>
         </SettingItem>
-        <p className="text-sm text-default-500 mt-3">
-          清空 Fake IP 后，客户端可能需要重新解析域名才能恢复访问。
-        </p>
       </SettingCard>
       <AdvancedSetting />
     </BasePage>
