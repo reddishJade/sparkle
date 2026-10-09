@@ -25,6 +25,7 @@ interface TrafficPreferences {
   dimension?: TrafficDimension
   sortBy?: 'total' | 'upload' | 'download'
   sortDirection?: 'asc' | 'desc'
+  ruleCategory?: 'all' | 'ruleset' | 'direct'
 }
 
 function loadStoredPreferences(): TrafficPreferences {
@@ -53,6 +54,10 @@ function parseRuleDisplay(name: string): { type: string; payload?: string } {
     return { type: match[1], payload: match[2] }
   }
   return { type: name }
+}
+
+function isRuleSet(name: string): boolean {
+  return name.startsWith('RuleSet(') || name.startsWith('RULE-SET(')
 }
 
 function renderRankBadge(index: number) {
@@ -112,18 +117,13 @@ const dimensionLabels: Record<TrafficDimension, string> = {
   connections: '连接'
 }
 
-const timeRangeLabels: Record<TrafficTimeRange, string> = {
-  session: '本次内核运行',
-  today: '今日统计',
-  '7d': '近 7 天累计',
-  '30d': '近 30 天累计',
-  all: '全部历史累计'
-}
-
 const TrafficPage: React.FC = () => {
   const initialPrefs = useMemo(() => loadStoredPreferences(), [])
   const [timeRange, setTimeRange] = useState<TrafficTimeRange>(initialPrefs.timeRange || 'session')
   const [dimension, setDimension] = useState<TrafficDimension>(initialPrefs.dimension || 'nodes')
+  const [ruleCategory, setRuleCategory] = useState<'all' | 'ruleset' | 'direct'>(
+    initialPrefs.ruleCategory || 'all'
+  )
   const [filter, setFilter] = useState('')
   const [sortBy, setSortBy] = useState<'total' | 'upload' | 'download'>(
     initialPrefs.sortBy || 'total'
@@ -140,12 +140,12 @@ const TrafficPage: React.FC = () => {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ timeRange, dimension, sortBy, sortDirection })
+        JSON.stringify({ timeRange, dimension, sortBy, sortDirection, ruleCategory })
       )
     } catch {
       // ignore
     }
-  }, [timeRange, dimension, sortBy, sortDirection])
+  }, [timeRange, dimension, sortBy, sortDirection, ruleCategory])
 
   const loadData = useCallback(async () => {
     try {
@@ -211,8 +211,14 @@ const TrafficPage: React.FC = () => {
     let summaryList: TrafficSummaryItem[] = []
     if (dimension === 'nodes') summaryList = stats.nodes || []
     else if (dimension === 'groups') summaryList = stats.groups || []
-    else if (dimension === 'rules') summaryList = stats.rules || []
-    else if (dimension === 'processes') summaryList = stats.processes || []
+    else if (dimension === 'rules') {
+      summaryList = stats.rules || []
+      if (ruleCategory === 'ruleset') {
+        summaryList = summaryList.filter((item) => isRuleSet(item.name))
+      } else if (ruleCategory === 'direct') {
+        summaryList = summaryList.filter((item) => !isRuleSet(item.name))
+      }
+    } else if (dimension === 'processes') summaryList = stats.processes || []
     else if (dimension === 'hosts') summaryList = stats.hosts || []
 
     if (q !== '') {
@@ -224,7 +230,7 @@ const TrafficPage: React.FC = () => {
       return (a.total - b.total) * dir
     })
     return sorted.map((item) => ({ kind: 'summary', data: item }))
-  }, [stats, dimension, filter, sortBy, sortDirection])
+  }, [stats, dimension, ruleCategory, filter, sortBy, sortDirection])
 
   const maxItemTotal = useMemo(() => {
     if (filteredAndSortedItems.length === 0) return 1
@@ -247,11 +253,7 @@ const TrafficPage: React.FC = () => {
       title="流量统计"
       contentClassName="overflow-hidden flex flex-col h-[calc(100vh-49px)]"
       header={
-        <div className="flex items-center gap-1.5">
-          <div className="flex items-center gap-1.5 mr-1.5 px-2 py-0.5 rounded-full bg-default-100 dark:bg-default-50/30 text-xs text-foreground-500">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px] font-medium">实时统计</span>
-          </div>
+        <div className="flex items-center gap-1">
           <Tooltip delay={0}>
             <Button
               size="sm"
@@ -305,7 +307,7 @@ const TrafficPage: React.FC = () => {
         />
       )}
 
-      {/* 顶部全景概况指标卡片 */}
+      {/* 顶部指标卡片 */}
       <div className="px-3 pt-2 pb-1 shrink-0">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {/* 卡片 1: 全景总流量 */}
@@ -340,9 +342,6 @@ const TrafficPage: React.FC = () => {
             <div className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">
               {calcTraffic(globalUpload)}
             </div>
-            <div className="text-[11px] font-mono text-foreground-400 mt-1">
-              占比 {globalUpRatio.toFixed(1)}%
-            </div>
           </div>
 
           {/* 卡片 3: 下行传输 */}
@@ -354,12 +353,9 @@ const TrafficPage: React.FC = () => {
             <div className="text-lg font-bold font-mono text-sky-600 dark:text-sky-400 tracking-tight">
               {calcTraffic(globalDownload)}
             </div>
-            <div className="text-[11px] font-mono text-foreground-400 mt-1">
-              占比 {globalDownRatio.toFixed(1)}%
-            </div>
           </div>
 
-          {/* 卡片 4: 统计维度与对账状态 */}
+          {/* 卡片 4: 统计维度项数与对账状态 */}
           <div className="rounded-xl border border-border/40 bg-surface/80 p-2.5 flex flex-col justify-between shadow-2xs">
             <div className="flex items-center justify-between text-xs text-foreground-500 mb-1">
               <span className="font-medium">{dimensionLabels[dimension]} 概况</span>
@@ -382,14 +378,11 @@ const TrafficPage: React.FC = () => {
               {filteredAndSortedItems.length}
               <span className="text-xs font-normal text-foreground-400 ml-1">项</span>
             </div>
-            <div className="text-[11px] text-foreground-400 mt-1 truncate">
-              {timeRangeLabels[timeRange]}
-            </div>
           </div>
         </div>
       </div>
 
-      {/* 控制工具栏：维度分段选择器 + 搜索 + 范围 + 排序 */}
+      {/* 控制工具栏：维度分段选择器 + 搜索 + 规则子筛选 + 范围 + 排序 */}
       <div className="px-3 py-2 flex flex-col gap-2 shrink-0 border-b border-border/30 bg-background/50 backdrop-blur-xs">
         {/* 第一行：平铺分段维度选择器 */}
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar p-1 rounded-xl bg-default-100/60 dark:bg-default-50/20 border border-border/30">
@@ -413,7 +406,7 @@ const TrafficPage: React.FC = () => {
           })}
         </div>
 
-        {/* 第二行：搜索过滤、时间跨度选择、排序字段与升降序 */}
+        {/* 第二行：搜索过滤、规则子类别(若为规则维度)、时间跨度选择、排序字段与升降序 */}
         <div className="flex items-center gap-2">
           <InputGroup fullWidth className="relative h-8">
             <InputGroup.Input
@@ -436,6 +429,45 @@ const TrafficPage: React.FC = () => {
               </InputGroup.Suffix>
             )}
           </InputGroup>
+
+          {/* 当处于分流规则维度时，展示快速子分类切换 */}
+          {dimension === 'rules' && (
+            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-default-100/80 dark:bg-default-50/30 border border-border/30 shrink-0">
+              <button
+                type="button"
+                onClick={() => setRuleCategory('all')}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  ruleCategory === 'all'
+                    ? 'bg-background text-foreground shadow-2xs'
+                    : 'text-foreground-500 hover:text-foreground'
+                }`}
+              >
+                全部
+              </button>
+              <button
+                type="button"
+                onClick={() => setRuleCategory('ruleset')}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  ruleCategory === 'ruleset'
+                    ? 'bg-background text-foreground shadow-2xs'
+                    : 'text-foreground-500 hover:text-foreground'
+                }`}
+              >
+                规则集
+              </button>
+              <button
+                type="button"
+                onClick={() => setRuleCategory('direct')}
+                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
+                  ruleCategory === 'direct'
+                    ? 'bg-background text-foreground shadow-2xs'
+                    : 'text-foreground-500 hover:text-foreground'
+                }`}
+              >
+                单条/覆写
+              </button>
+            </div>
+          )}
 
           <Select
             aria-label="时间跨度"
@@ -672,16 +704,26 @@ const TrafficPage: React.FC = () => {
                         {dimension === 'rules' ? (
                           (() => {
                             const { type, payload } = parseRuleDisplay(summary.name)
+                            const isSet = type.toLowerCase() === 'ruleset'
                             return (
                               <div className="flex items-center gap-1.5 min-w-0">
-                                <span className="text-[10px] px-1.5 py-0.5 rounded font-mono font-medium bg-default-100 dark:bg-default-50/60 text-foreground-500 uppercase shrink-0">
-                                  {type}
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium uppercase shrink-0 ${
+                                    isSet
+                                      ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25'
+                                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
+                                  }`}
+                                >
+                                  {isSet ? '规则集' : type}
                                 </span>
-                                {payload ? (
-                                  <span className="truncate text-sm font-medium text-foreground select-text font-mono text-[13px]">
-                                    {payload}
+                                <span className="truncate text-sm font-medium text-foreground select-text font-mono text-[13px]">
+                                  {payload || type}
+                                </span>
+                                {!isSet && (
+                                  <span className="text-[10px] text-foreground-400 px-1 py-0.2 rounded bg-default-100 dark:bg-default-50/40 shrink-0">
+                                    单条/覆写
                                   </span>
-                                ) : null}
+                                )}
                               </div>
                             )
                           })()
