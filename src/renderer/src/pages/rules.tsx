@@ -1,10 +1,10 @@
 import { Separator, InputGroup, Button } from '@heroui/react'
 
 import RuleProvider from '@renderer/components/resources/rule-provider'
-import GeoData from '@renderer/components/resources/geo-data'
 import BasePage from '@renderer/components/base/base-page'
 import RuleItem from '@renderer/components/rules/rule-item'
 import { Virtuoso } from 'react-virtuoso'
+import { MdSort } from 'react-icons/md'
 import { useMemo, useState } from 'react'
 import { useRules } from '@renderer/hooks/use-rules'
 import { includesIgnoreCase } from '@renderer/utils/includes'
@@ -13,18 +13,28 @@ const Rules: React.FC = () => {
   const { rules } = useRules()
   const [tab, setTab] = useState('rules')
   const [filter, setFilter] = useState('')
+  const [enabled, setEnabled] = useState('all')
+  const [type, setType] = useState('')
+  const [target, setTarget] = useState('')
+  const [sortByHits, setSortByHits] = useState(false)
+  const types = useMemo(() => [...new Set(rules?.rules.map((rule) => rule.type) ?? [])], [rules])
+  const targets = useMemo(() => [...new Set(rules?.rules.map((rule) => rule.proxy) ?? [])], [rules])
 
   const filteredRules = useMemo(() => {
     if (!rules) return []
-    if (filter === '') return rules.rules
-    return rules.rules.filter((rule) => {
-      return (
-        includesIgnoreCase(rule.payload, filter) ||
-        includesIgnoreCase(rule.type, filter) ||
-        includesIgnoreCase(rule.proxy, filter)
-      )
-    })
-  }, [rules, filter])
+    const matches = rules.rules.filter(
+      (rule) =>
+        (!filter ||
+          [rule.payload, rule.type, rule.proxy].some((value) =>
+            includesIgnoreCase(value, filter)
+          )) &&
+        (enabled === 'all' ||
+          (enabled === 'enabled' ? !rule.extra.disabled : rule.extra.disabled)) &&
+        (!type || rule.type === type) &&
+        (!target || rule.proxy === target)
+    )
+    return sortByHits ? [...matches].sort((a, b) => b.extra.hitCount - a.extra.hitCount) : matches
+  }, [rules, filter, enabled, type, target, sortByHits])
 
   const totalHitCount = useMemo(() => {
     if (!rules?.rules) return 0
@@ -38,8 +48,7 @@ const Rules: React.FC = () => {
         <div className="flex gap-1 app-nodrag">
           {[
             ['rules', '规则'],
-            ['providers', '规则集合'],
-            ['geo', '地理数据库']
+            ['providers', '规则提供者']
           ].map(([id, label]) => (
             <Button
               key={id}
@@ -48,6 +57,9 @@ const Rules: React.FC = () => {
               onPress={() => setTab(id)}
             >
               {label}
+              {id === 'rules' && (
+                <span className="text-xs opacity-70">{rules?.rules.length ?? 0}</span>
+              )}
             </Button>
           ))}
         </div>
@@ -55,11 +67,9 @@ const Rules: React.FC = () => {
     >
       {tab === 'providers' ? (
         <RuleProvider />
-      ) : tab === 'geo' ? (
-        <GeoData />
       ) : (
-        <>
-          <div className="sticky top-0 z-40">
+        <div className="flex flex-col h-full">
+          <div className="shrink-0 bg-background">
             <div className="flex p-2">
               <InputGroup fullWidth>
                 <InputGroup.Input
@@ -88,9 +98,63 @@ const Rules: React.FC = () => {
                 )}
               </InputGroup>
             </div>
+            <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
+              {(
+                [
+                  ['all', '全部'],
+                  ['enabled', '已启用'],
+                  ['disabled', '已禁用']
+                ] as const
+              ).map(([id, label]) => (
+                <Button
+                  key={id}
+                  size="sm"
+                  variant={enabled === id ? 'primary' : 'ghost'}
+                  onPress={() => setEnabled(id)}
+                >
+                  {label}
+                </Button>
+              ))}
+              {types.map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={type === value ? 'primary' : 'ghost'}
+                  onPress={() => setType(type === value ? '' : value)}
+                >
+                  {value}
+                  <span className="text-xs opacity-60">
+                    {rules?.rules.filter((rule) => rule.type === value).length}
+                  </span>
+                </Button>
+              ))}
+              <span className="mx-1 h-5 border-l border-divider" />
+              {targets.map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={target === value ? 'primary' : 'ghost'}
+                  onPress={() => setTarget(target === value ? '' : value)}
+                >
+                  {value}
+                  <span className="text-xs opacity-60">
+                    {rules?.rules.filter((rule) => rule.proxy === value).length}
+                  </span>
+                </Button>
+              ))}
+              <Button
+                size="sm"
+                isIconOnly
+                variant={sortByHits ? 'primary' : 'ghost'}
+                aria-label="按命中次数排序"
+                onPress={() => setSortByHits(!sortByHits)}
+              >
+                <MdSort />
+              </Button>
+            </div>
             <Separator />
           </div>
-          <div className="h-[calc(100vh-100px)] mt-px">
+          <div className="flex-1 min-h-0 mt-px">
             <Virtuoso
               data={filteredRules}
               context={{ totalHitCount }}
@@ -99,7 +163,7 @@ const Rules: React.FC = () => {
               )}
             />
           </div>
-        </>
+        </div>
       )}
     </BasePage>
   )

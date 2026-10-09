@@ -1,6 +1,7 @@
 import { Chip, Card, Switch } from '@heroui/react'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useRules } from '@renderer/hooks/use-rules'
 import { mihomoRulesDisable } from '@renderer/utils/ipc'
 import RuleDetailTooltip from './rule-detail-tooltip'
 
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
+  const { mutate } = useRules()
   const [isEnabled, setIsEnabled] = useState(!rule.extra.disabled)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -27,8 +29,7 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
 
   const hasStats = Boolean(hitCount > 0 && totalHitCount > 0)
   const hitRatio = hasStats ? (hitCount / totalHitCount) * 100 : 0
-  const hitRatioText =
-    hitRatio >= 0.1 ? `${hitRatio.toFixed(1)}%` : hitRatio > 0 ? '<0.1%' : '0%'
+  const hitRatioText = hitRatio >= 0.1 ? `${hitRatio.toFixed(1)}%` : hitRatio > 0 ? '<0.1%' : '0%'
 
   useEffect(() => {
     setIsEnabled(!rule.extra.disabled)
@@ -68,6 +69,7 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
     setIsEnabled(v)
     try {
       await mihomoRulesDisable({ [rule.index]: !v })
+      mutate()
     } catch {
       setIsEnabled(!v)
     }
@@ -77,8 +79,10 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
     <div className={`w-full px-2 pb-2 ${index === 0 ? 'pt-2' : ''}`}>
       <Card>
         <Card.Content className="w-full">
-          <div className="flex justify-between text-ellipsis whitespace-nowrap overflow-hidden">
+          <div className="truncate font-semibold mb-2" title={rule.payload || 'Match'}>
             {rule.payload || 'Match'}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <Switch size="sm" isSelected={isEnabled} onChange={handleToggle} aria-label="启用">
               <Switch.Content>
                 <Switch.Control>
@@ -86,23 +90,36 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
                 </Switch.Control>
               </Switch.Content>
             </Switch>
-          </div>
-          <div className="flex justify-between mt-1">
-            <div className="flex justify-start text-foreground-500">
-              <div>{rule.type}</div>
-              <div className="ml-2">{rule.proxy}</div>
+            <Chip size="sm" data-color="primary" variant="soft">
+              <Chip.Label>{rule.type}</Chip.Label>
+            </Chip>
+            <span className="text-foreground-500">→</span>
+            <Chip size="sm" data-color="secondary" variant="soft">
+              <Chip.Label>{rule.proxy}</Chip.Label>
+            </Chip>
+            <div
+              className="flex items-center gap-2"
+              ref={wrapperRef}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+            >
+              <Chip size="sm" data-color="success" variant="soft">
+                <Chip.Label>{hitCount ?? 0}</Chip.Label>
+              </Chip>
+              <Chip size="sm" data-color="warning" variant="soft">
+                <Chip.Label>{rule.extra.missCount ?? 0}</Chip.Label>
+              </Chip>
+              {hasStats && <span className="text-foreground-500">{hitRatioText}</span>}
             </div>
-            {hasStats && (
-              <div ref={wrapperRef} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
-                <Chip
-                  size="sm"
-                  data-color="primary"
-                  variant="soft"
-                  className={['text-xs'].filter(Boolean).join(' ')}
-                >
-                  <Chip.Label>{hitRatioText}</Chip.Label>
-                </Chip>
-              </div>
+            {rule.extra.hitAt && Date.parse(rule.extra.hitAt) > 0 && (
+              <span className="text-foreground-500">
+                最近命中 {dayjs(rule.extra.hitAt).fromNow()}
+              </span>
+            )}
+            {rule.extra.missAt && Date.parse(rule.extra.missAt) > 0 && (
+              <span className="text-foreground-500">
+                最近未命中 {dayjs(rule.extra.missAt).fromNow()}
+              </span>
             )}
           </div>
         </Card.Content>

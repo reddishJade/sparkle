@@ -1,418 +1,709 @@
-// Proxy workflows adapted from metacubexd; Sparkle's theme, native actions and node details are retained.
-import { Button, InputGroup } from '@heroui/react'
-import { useEffect, useMemo, useState } from 'react'
-import { Virtuoso } from 'react-virtuoso'
-import BasePage from '@renderer/components/base/base-page'
-import ProxyItem from '@renderer/components/proxies/proxy-item'
-import ProxySettingDrawer from '@renderer/components/proxies/proxy-setting-drawer'
-import ConnectivityBoard from '@renderer/components/proxies/connectivity-board'
+import { Chip, Button, Spinner, Card, Avatar } from '@heroui/react'
+import { Pressable } from 'react-aria'
+
 import ProxyProvider from '@renderer/components/resources/proxy-provider'
-import { useGroups } from '@renderer/hooks/use-groups'
+import BasePage from '@renderer/components/base/base-page'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
-import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import {
+  getImageDataURL,
   mihomoChangeProxy,
   mihomoCloseConnections,
-  mihomoProxyDelay,
   mihomoGroupDelay,
-  mihomoUnfixedProxy
+  mihomoProxyDelay
 } from '@renderer/utils/ipc'
-import { runDelayTestsWithConcurrency } from '@renderer/utils/delay-test'
-import { notify } from '@renderer/utils/notification'
+import { FaLocationCrosshairs } from 'react-icons/fa6'
 import {
-  calculateNodeScore,
-  findRecommendedNode,
-  type NodePerformanceData
-} from '@renderer/utils/node-scoring'
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode
+} from 'react'
+import { GroupedVirtuoso, GroupedVirtuosoHandle } from 'react-virtuoso'
+import ProxyItem from '@renderer/components/proxies/proxy-item'
+import ProxySettingDrawer from '@renderer/components/proxies/proxy-setting-drawer'
+import { IoIosArrowBack } from 'react-icons/io'
+import { MdDoubleArrow, MdOutlineSpeed, MdTune } from 'react-icons/md'
+import { useGroups } from '@renderer/hooks/use-groups'
+import CollapseInput from '@renderer/components/base/collapse-input'
+import { includesIgnoreCase } from '@renderer/utils/includes'
+import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
+import { runDelayTestsWithConcurrency } from '@renderer/utils/delay-test'
 
-type Proxy = ControllerProxiesDetail | ControllerGroupDetail
-const delay = (proxy: Proxy) => proxy.history.at(-1)?.delay ?? -1
-function read<T>(key: string, fallback: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback
-  } catch {
-    return fallback
-  }
+type ProxyLike = ControllerProxiesDetail | ControllerGroupDetail
+
+const EMPTY_PROXIES: ProxyLike[] = []
+
+function getProxyDelay(proxy: ProxyLike): number {
+  return proxy.history.length > 0 ? proxy.history[proxy.history.length - 1].delay : -1
 }
-export default function Proxies() {
-  const { groups = [], mutate } = useGroups()
-  const { appConfig, patchAppConfig } = useAppConfig()
-  const { controledMihomoConfig } = useControledMihomoConfig()
+
+function compareProxyDelay(a: ProxyLike, b: ProxyLike): number {
+  const delayA = getProxyDelay(a)
+  const delayB = getProxyDelay(b)
+  if (delayA === -1) return -1
+  if (delayB === -1) return 1
+  if (delayA === 0) return 1
+  if (delayB === 0) return -1
+  return delayA - delayB
+}
+
+function getProviderName(proxy: ProxyLike): string | undefined {
+  return 'provider-name' in proxy ? proxy['provider-name'] : undefined
+}
+
+interface GroupHeaderProps {
+  index: number
+  group: ControllerMixedGroup
+  isOpen: boolean
+  isLast: boolean
+  groupDisplayLayout: 'hidden' | 'single' | 'double'
+  searchValue: string
+  delaying: boolean
+  onToggle: (index: number, currentlyOpen: boolean) => void
+  onUpdateSearch: (index: number, value: string) => void
+  onScrollToProxy: (index: number) => void
+  onGroupDelay: (index: number) => void
+}
+
+const GroupHeader = memo(function GroupHeader({
+  index,
+  group,
+  isOpen,
+  isLast,
+  groupDisplayLayout,
+  searchValue,
+  delaying,
+  onToggle,
+  onUpdateSearch,
+  onScrollToProxy,
+  onGroupDelay
+}: GroupHeaderProps) {
+  return (
+    <div className={`w-full pt-2 ${isLast && !isOpen ? 'pb-2' : ''} px-2`}>
+      <Pressable onPress={() => onToggle(index, isOpen)}>
+        <Card className="w-full" data-pressable="true" role="button" tabIndex={0}>
+          <Card.Content
+            className={`h-14 w-full overflow-hidden py-2 pr-3 ${group.icon ? 'pl-2' : 'pl-3'}`}
+          >
+            <div className="flex h-full min-h-0 justify-between">
+              <div className="flex h-full min-w-0 items-center overflow-hidden whitespace-nowrap">
+                {group.icon ? (
+                  <Avatar
+                    className="mr-3 h-10 w-10 shrink-0 bg-transparent overflow-visible! rounded-none!"
+                    size="md"
+                  >
+                    <Avatar.Image
+                      className="object-contain"
+                      src={
+                        group.icon.startsWith('<svg')
+                          ? `data:image/svg+xml;utf8,${group.icon}`
+                          : localStorage.getItem(group.icon) || group.icon
+                      }
+                    />
+                  </Avatar>
+                ) : null}
+                <div className="flex min-w-0 flex-col justify-center">
+                  <div
+                    className={`truncate ${groupDisplayLayout === 'double' ? 'text-md leading-5' : 'text-lg leading-tight'}`}
+                  >
+                    <span className="flag-emoji inline-block">{group.name}</span>
+                    {groupDisplayLayout === 'single' && (
+                      <>
+                        <div className="inline ml-2 text-sm text-foreground-500">{group.type}</div>
+                        <div className="inline flag-emoji ml-2 text-sm text-foreground-500">
+                          {group.now}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {groupDisplayLayout === 'double' && (
+                    <div className="truncate text-[10px] leading-4 text-foreground-500">
+                      <span>{group.type}</span>
+                      <span className="flag-emoji ml-1 inline-block">{group.now}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex shrink-0 items-center">
+                <div
+                  className="flex items-center"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                >
+                  <Chip
+                    size="sm"
+                    data-color="default"
+                    variant="primary"
+                    className={['my-1 mr-2'].filter(Boolean).join(' ')}
+                  >
+                    <Chip.Label>{group.all.length}</Chip.Label>
+                  </Chip>
+                  <CollapseInput
+                    value={searchValue}
+                    onValueChange={(v) => onUpdateSearch(index, v)}
+                  />
+                  <Button
+                    size="sm"
+                    isIconOnly
+                    onPress={() => onScrollToProxy(index)}
+                    variant="ghost"
+                    data-color="default"
+                  >
+                    <FaLocationCrosshairs className="text-lg text-foreground-500" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    isIconOnly
+                    onPress={() => onGroupDelay(index)}
+                    variant="ghost"
+                    data-color="default"
+                    isPending={delaying}
+                    isDisabled={delaying}
+                  >
+                    {delaying ? (
+                      <Spinner size="sm" color="current" />
+                    ) : (
+                      <MdOutlineSpeed className="text-lg text-foreground-500" />
+                    )}
+                  </Button>
+                </div>
+                <IoIosArrowBack
+                  className={`transition duration-200 ml-2 h-8 text-lg text-foreground-500 flex items-center ${isOpen ? '-rotate-90' : ''}`}
+                />
+              </div>
+            </div>
+          </Card.Content>
+        </Card>
+      </Pressable>
+    </div>
+  )
+})
+
+interface ProxyGroupPageCache {
+  isOpen: Record<string, boolean>
+  searchValue: Record<string, string>
+  scrollTop: number
+}
+
+const proxyGroupPageCache: ProxyGroupPageCache = {
+  isOpen: {},
+  searchValue: {},
+  scrollTop: 0
+}
+
+const Proxies: React.FC = () => {
   const [tab, setTab] = useState('groups')
-  const [filter, setFilter] = useState('')
-  const [expanded, setExpanded] = useState<Record<string, boolean>>(() =>
-    appConfig?.rememberProxyGroupOpenState ? read('proxy-expanded', {}) : {}
-  )
-  const [limits, setLimits] = useState<Record<string, number>>({})
-  const [busy, setBusy] = useState<Set<string>>(new Set())
-  const [progress, setProgress] = useState<{ total: number; complete: number }>()
-  const [connectivity, setConnectivity] = useState(false)
-  const [settings, setSettings] = useState(false)
-  const [layout, setLayout] = useState<string>(() => read('proxy-view', 'card'))
-  const [availability, setAvailability] = useState<string>(() => read('proxy-availability', 'all'))
-  const [activeGroup, setActiveGroup] = useState('')
-  const [autoSwitch, setAutoSwitch] = useState<boolean>(() => read('proxy-auto-recommend', false))
-  const [performance, setPerformance] = useState<Record<string, NodePerformanceData>>(() =>
-    read('proxy-performance', {})
-  )
-  const [excluded, setExcluded] = useState<string[]>(() => read('proxy-excluded', []))
-  const sort = appConfig?.proxyDisplayOrder ?? 'default'
-  useEffect(() => {
-    localStorage.setItem('proxy-view', JSON.stringify(layout))
-    localStorage.setItem('proxy-availability', JSON.stringify(availability))
-    localStorage.setItem('proxy-auto-recommend', JSON.stringify(autoSwitch))
-    localStorage.setItem('proxy-excluded', JSON.stringify(excluded))
-  }, [layout, availability, autoSwitch, excluded])
-  useEffect(() => {
-    if (appConfig?.rememberProxyGroupOpenState)
-      localStorage.setItem('proxy-expanded', JSON.stringify(expanded))
-  }, [expanded, appConfig?.rememberProxyGroupOpenState])
-  const shownGroups = useMemo(
-    () =>
-      groups.filter(
-        (group) =>
-          !group.hidden && (controledMihomoConfig?.mode !== 'global' || group.name === 'GLOBAL')
-      ),
-    [groups, controledMihomoConfig?.mode]
-  )
-  const renderedGroups = useMemo(
-    () =>
-      shownGroups.filter(
-        (group) =>
-          !filter ||
-          [group.name, ...group.all.map((p) => p.name)].some((name) =>
-            name.toLowerCase().includes(filter.toLowerCase())
-          )
-      ),
-    [shownGroups, filter]
-  )
-  function nodes(group: ControllerMixedGroup): Proxy[] {
-    let result = group.all.filter(
-      (proxy) =>
-        (!filter ||
-          group.name.toLowerCase().includes(filter.toLowerCase()) ||
-          proxy.name.toLowerCase().includes(filter.toLowerCase())) &&
-        (availability === 'all' ||
-          (availability === 'alive' ? proxy.alive !== false : proxy.alive === false))
-    )
-    if (sort === 'name') result = [...result].sort((a, b) => a.name.localeCompare(b.name))
-    if (sort === 'delay')
-      result = [...result].sort(
-        (a, b) => (delay(a) > 0 ? delay(a) : Infinity) - (delay(b) > 0 ? delay(b) : Infinity)
-      )
-    return result
-  }
-  async function select(group: string, proxy: string): Promise<void> {
-    try {
-      await mihomoChangeProxy(group, proxy)
-      if (appConfig?.autoCloseConnection ?? true)
-        await mihomoCloseConnections(appConfig?.closeMode === 'group' ? group : undefined)
-      mutate()
-    } catch (error) {
-      notify(error, { variant: 'danger' })
+  const { controledMihomoConfig } = useControledMihomoConfig()
+  const { mode = 'rule' } = controledMihomoConfig || {}
+  const { groups = [], mutate } = useGroups()
+  const { appConfig } = useAppConfig()
+  const {
+    proxyDisplayLayout = 'double',
+    groupDisplayLayout = 'double',
+    showGroupSelectedProxy = false,
+    showProxyDetailTooltip = false,
+    proxyDisplayOrder = 'default',
+    autoCloseConnection = true,
+    closeMode = 'all',
+    proxyCols = 'auto',
+    delayTestUrlScope = 'group',
+    delayTestUseGroupApi = false,
+    delayTestConcurrency,
+    rememberProxyGroupOpenState = false
+  } = appConfig || {}
+  const [cols, setCols] = useState(1)
+  const [isOpen, setIsOpen] = useState<boolean[]>(() => {
+    if (
+      rememberProxyGroupOpenState &&
+      groups.length > 0 &&
+      Object.keys(proxyGroupPageCache.isOpen).length > 0
+    ) {
+      return groups.map((group) => proxyGroupPageCache.isOpen[group.name] ?? false)
     }
-  }
-  function testURL(group?: ControllerMixedGroup): string | undefined {
-    return appConfig?.delayTestUrlScope === 'global' ? undefined : group?.testUrl
-  }
-  function saveMeasurements(results: Record<string, number>): Record<string, NodePerformanceData> {
-    const next = { ...read<Record<string, NodePerformanceData>>('proxy-performance', {}) }
-    for (const [name, latency] of Object.entries(results))
-      next[name] = {
-        history: [
-          { timestamp: Date.now(), latency: latency > 0 ? latency : null, success: latency > 0 },
-          ...(next[name]?.history ?? [])
-        ].slice(0, 20)
+    return Array(groups.length).fill(false)
+  })
+  const [isOpenContent, setIsOpenContent] = useState<boolean[]>(isOpen)
+  const isOpenContentRef = useRef<boolean[]>(isOpen)
+  isOpenContentRef.current = isOpenContent
+  const [delaying, setDelaying] = useState(Array(groups.length).fill(false))
+  const [searchValue, setSearchValue] = useState<string[]>(() => {
+    if (
+      rememberProxyGroupOpenState &&
+      groups.length > 0 &&
+      Object.keys(proxyGroupPageCache.searchValue).length > 0
+    ) {
+      return groups.map((group) => proxyGroupPageCache.searchValue[group.name] ?? '')
+    }
+    return Array(groups.length).fill('')
+  })
+  const [isSettingDrawerOpen, setIsSettingDrawerOpen] = useState(false)
+  const [settingDrawerReopenSignal, setSettingDrawerReopenSignal] = useState(0)
+  const [initialScrollTop] = useState(() =>
+    rememberProxyGroupOpenState ? proxyGroupPageCache.scrollTop : 0
+  )
+  const virtuosoRef = useRef<GroupedVirtuosoHandle>(null)
+  const pendingScrollRef = useRef<number | null>(null)
+  const scrollerElRef = useRef<HTMLElement | null>(null)
+  const rememberProxyGroupOpenStateRef = useRef(rememberProxyGroupOpenState)
+  rememberProxyGroupOpenStateRef.current = rememberProxyGroupOpenState
+  const previousGroupsRef = useRef(groups)
+
+  const scrollerRef = useCallback((el: Window | HTMLElement | null) => {
+    if (scrollerElRef.current) {
+      if (rememberProxyGroupOpenStateRef.current && scrollerElRef.current.isConnected) {
+        proxyGroupPageCache.scrollTop = scrollerElRef.current.scrollTop
       }
-    localStorage.setItem('proxy-performance', JSON.stringify(next))
-    setPerformance(next)
-    return next
-  }
-  async function testNode(
-    proxy: Proxy,
-    group?: ControllerMixedGroup
-  ): Promise<ControllerProxiesDelay> {
-    try {
-      const result = await mihomoProxyDelay(
-        proxy.name,
-        testURL(group),
-        'provider-name' in proxy ? proxy['provider-name'] : undefined
-      )
-      saveMeasurements({ [proxy.name]: result.delay ?? 0 })
-      return result
-    } catch (e) {
-      saveMeasurements({ [proxy.name]: 0 })
-      throw e
+      scrollerElRef.current.onscroll = null
     }
-  }
-  async function testGroups(targets: ControllerMixedGroup[]): Promise<void> {
-    if (busy.size) return
-    setBusy(new Set(targets.map((group) => group.name)))
-    const items = targets.flatMap((group) => nodes(group).map((proxy) => ({ group, proxy })))
-    setProgress({ total: items.length, complete: 0 })
-    const results: Record<string, number> = {}
-    try {
-      if (appConfig?.delayTestUseGroupApi) {
-        await runDelayTestsWithConcurrency(targets, 3, async (group) => {
+    scrollerElRef.current = el instanceof HTMLElement ? el : null
+    if (scrollerElRef.current) {
+      const htmlEl = scrollerElRef.current
+      htmlEl.onscroll = () => {
+        if (rememberProxyGroupOpenStateRef.current) {
+          proxyGroupPageCache.scrollTop = htmlEl.scrollTop
+        }
+      }
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    const previousGroups = previousGroupsRef.current
+    previousGroupsRef.current = groups
+    if (
+      previousGroups.length === groups.length &&
+      previousGroups.every((group, index) => group.name === groups[index].name)
+    ) {
+      return
+    }
+
+    const remapByGroupName = <T,>(
+      prev: T[],
+      getFallback: (group: ControllerMixedGroup) => T
+    ): T[] => {
+      const previousValues = new Map(
+        previousGroups.map((group, index) => [group.name, prev[index]] as const)
+      )
+      return groups.map((group) => previousValues.get(group.name) ?? getFallback(group))
+    }
+
+    const getOpenFallback = (group: ControllerMixedGroup): boolean =>
+      rememberProxyGroupOpenStateRef.current
+        ? (proxyGroupPageCache.isOpen[group.name] ?? false)
+        : false
+    setIsOpen((prev) => remapByGroupName(prev, getOpenFallback))
+    setIsOpenContent((prev) => remapByGroupName(prev, getOpenFallback))
+    setSearchValue((prev) =>
+      remapByGroupName(prev, (group) =>
+        rememberProxyGroupOpenStateRef.current
+          ? (proxyGroupPageCache.searchValue[group.name] ?? '')
+          : ''
+      )
+    )
+    setDelaying((prev) => remapByGroupName(prev, () => false))
+  }, [groups])
+
+  const { groupCounts, allProxies } = useMemo(() => {
+    const groupCounts: number[] = []
+    const allProxies: ProxyLike[][] = []
+    groups.forEach((group, index) => {
+      if (isOpenContent[index]) {
+        const searchText = searchValue[index] || ''
+        let groupProxies = searchText
+          ? group.all.filter((proxy) => proxy && includesIgnoreCase(proxy.name, searchText))
+          : (group.all as ProxyLike[])
+
+        if (proxyDisplayOrder === 'delay') {
+          groupProxies = [...groupProxies].sort(compareProxyDelay)
+        }
+        if (proxyDisplayOrder === 'name') {
+          groupProxies = [...groupProxies].sort((a, b) => a.name.localeCompare(b.name))
+        }
+
+        groupCounts.push(Math.ceil(groupProxies.length / cols))
+        allProxies.push(groupProxies)
+      } else {
+        groupCounts.push(0)
+        allProxies.push(EMPTY_PROXIES)
+      }
+    })
+    return { groupCounts, allProxies }
+  }, [groups, isOpenContent, proxyDisplayOrder, cols, searchValue])
+
+  const onChangeProxy = useCallback(
+    async (group: string, proxy: string): Promise<void> => {
+      await mihomoChangeProxy(group, proxy)
+      if (autoCloseConnection) {
+        if (closeMode === 'all') {
+          await mihomoCloseConnections()
+        } else if (closeMode === 'group') {
+          await mihomoCloseConnections(group)
+        }
+      }
+      mutate()
+    },
+    [autoCloseConnection, closeMode, mutate]
+  )
+
+  const getDelayTestUrl = useCallback(
+    (group?: ControllerMixedGroup): string | undefined => {
+      if (delayTestUrlScope === 'global') return undefined
+      return group?.testUrl
+    },
+    [delayTestUrlScope]
+  )
+
+  const onProxyDelay = useCallback(
+    async (proxy: ProxyLike, group?: ControllerMixedGroup): Promise<ControllerProxiesDelay> => {
+      return await mihomoProxyDelay(proxy.name, getDelayTestUrl(group), getProviderName(proxy))
+    },
+    [getDelayTestUrl]
+  )
+
+  const setGroupDelaying = useCallback((index: number, value: boolean): void => {
+    setDelaying((prev) => {
+      const newDelaying = [...prev]
+      newDelaying[index] = value
+      return newDelaying
+    })
+  }, [])
+
+  const onGroupDelay = useCallback(
+    async (index: number): Promise<void> => {
+      const group = groups[index]
+      if (!group) return
+
+      const openedProxies = allProxies[index] || EMPTY_PROXIES
+      const proxies = openedProxies.length > 0 ? openedProxies : group.all
+      if (proxies.length === 0) return
+
+      if (openedProxies.length === 0) {
+        if (rememberProxyGroupOpenStateRef.current) {
+          proxyGroupPageCache.isOpen[group.name] = true
+        }
+        setIsOpen((prev) => {
+          const newOpen = [...prev]
+          newOpen[index] = true
+          return newOpen
+        })
+        setTimeout(() => {
+          setIsOpenContent((prev) => {
+            const newOpen = [...prev]
+            newOpen[index] = true
+            return newOpen
+          })
+        }, 0)
+      }
+
+      const testUrl = getDelayTestUrl(group)
+      setGroupDelaying(index, true)
+
+      try {
+        if (delayTestUseGroupApi) {
+          await mihomoGroupDelay(group.name, testUrl)
+          return
+        }
+
+        await runDelayTestsWithConcurrency(proxies, delayTestConcurrency, async (proxy) => {
           try {
-            const result = await mihomoGroupDelay(group.name, testURL(group))
-            Object.assign(results, result)
-          } catch (e) {
-            notify(`${group.name} 测试失败：${e}`, { variant: 'danger' })
+            await mihomoProxyDelay(proxy.name, testUrl, getProviderName(proxy))
+          } catch {
+            // ignore
           }
         })
-      } else {
-        await runDelayTestsWithConcurrency(
-          items,
-          appConfig?.delayTestConcurrency,
-          async ({ group, proxy }) => {
-            try {
-              const result = await mihomoProxyDelay(
-                proxy.name,
-                testURL(group),
-                'provider-name' in proxy ? proxy['provider-name'] : undefined
-              )
-              results[proxy.name] = result.delay ?? 0
-            } catch {
-              results[proxy.name] = 0
-            }
-            setProgress((old) => (old ? { ...old, complete: old.complete + 1 } : old))
-          }
-        )
+      } catch {
+        // ignore
+      } finally {
+        mutate()
+        setGroupDelaying(index, false)
       }
-      const next = saveMeasurements(results)
-      if (autoSwitch)
-        for (const group of targets) {
-          const recommended = findRecommendedNode(
-            group.all.filter((p) => (results[p.name] ?? 0) > 0).map((p) => p.name),
-            new Map(Object.entries(next)),
-            excluded
-          )
-          if (recommended && recommended !== group.now) await select(group.name, recommended)
-        }
-    } finally {
-      mutate()
-      setBusy(new Set())
-      setProgress(undefined)
+    },
+    [
+      allProxies,
+      groups,
+      delayTestUseGroupApi,
+      delayTestConcurrency,
+      mutate,
+      getDelayTestUrl,
+      setGroupDelaying
+    ]
+  )
+
+  const calcCols = useCallback((): number => {
+    if (window.matchMedia('(min-width: 1536px)').matches) {
+      return 5
+    } else if (window.matchMedia('(min-width: 1280px)').matches) {
+      return 4
+    } else if (window.matchMedia('(min-width: 1024px)').matches) {
+      return 3
+    } else {
+      return 2
     }
-  }
-  const selectedGroup =
-    renderedGroups.find((group) => group.name === activeGroup) ?? renderedGroups[0]
-  function groupView(group: ControllerMixedGroup, forceOpen = false) {
-    const items = nodes(group)
-    const limit = limits[group.name] ?? 50
-    const open = forceOpen || expanded[group.name] || Boolean(filter)
-    const candidates = group.all
-      .filter(
-        (p) =>
-          p.alive !== false && delay(p) !== 0 && (performance[p.name]?.history[0]?.success ?? false)
+  }, [])
+
+  const toggleOpen = useCallback((index: number, currentlyOpen: boolean) => {
+    const newVal = !currentlyOpen
+    if (rememberProxyGroupOpenStateRef.current) {
+      const groupName = groupsRef.current[index]?.name
+      if (groupName) proxyGroupPageCache.isOpen[groupName] = newVal
+    }
+    setIsOpen((prev) => {
+      const newOpen = [...prev]
+      newOpen[index] = newVal
+      return newOpen
+    })
+    if (currentlyOpen) {
+      setIsOpenContent((prev) => {
+        const newOpen = [...prev]
+        newOpen[index] = false
+        return newOpen
+      })
+    } else {
+      setTimeout(() => {
+        setIsOpenContent((prev) => {
+          const newOpen = [...prev]
+          newOpen[index] = true
+          return newOpen
+        })
+      }, 0)
+    }
+  }, [])
+
+  const updateSearchValue = useCallback((index: number, value: string) => {
+    if (rememberProxyGroupOpenStateRef.current) {
+      const groupName = groupsRef.current[index]?.name
+      if (groupName) proxyGroupPageCache.searchValue[groupName] = value
+    }
+    setSearchValue((prev) => {
+      const newSearchValue = [...prev]
+      newSearchValue[index] = value
+      return newSearchValue
+    })
+    if (value) {
+      setIsOpen((prev) => {
+        if (prev[index]) return prev
+        if (rememberProxyGroupOpenStateRef.current) {
+          const groupName = groupsRef.current[index]?.name
+          if (groupName) proxyGroupPageCache.isOpen[groupName] = true
+        }
+        const newOpen = [...prev]
+        newOpen[index] = true
+        return newOpen
+      })
+      setTimeout(() => {
+        setIsOpenContent((prev) => {
+          if (prev[index]) return prev
+          const newOpen = [...prev]
+          newOpen[index] = true
+          return newOpen
+        })
+      }, 0)
+    }
+  }, [])
+
+  const doScrollToCurrentProxy = useCallback(
+    (index: number) => {
+      let i = 0
+      for (let j = 0; j < index; j++) {
+        i += groupCounts[j]
+      }
+      const proxies = allProxies[index].length > 0 ? allProxies[index] : groups[index].all
+      i += Math.floor(proxies.findIndex((proxy) => proxy.name === groups[index].now) / cols)
+      virtuosoRef.current?.scrollToIndex({
+        index: Math.floor(i),
+        align: 'start',
+        behavior: 'smooth'
+      })
+    },
+    [groupCounts, allProxies, groups, cols]
+  )
+
+  useEffect(() => {
+    if (pendingScrollRef.current !== null && isOpenContent[pendingScrollRef.current]) {
+      const index = pendingScrollRef.current
+      pendingScrollRef.current = null
+      setTimeout(() => doScrollToCurrentProxy(index), 150)
+    }
+  }, [isOpenContent, doScrollToCurrentProxy])
+
+  const scrollToCurrentProxy = useCallback(
+    (index: number) => {
+      if (!isOpenContentRef.current[index]) {
+        pendingScrollRef.current = index
+        setIsOpen((prev) => {
+          const newOpen = [...prev]
+          newOpen[index] = true
+          return newOpen
+        })
+        setTimeout(() => {
+          setIsOpenContent((prev) => {
+            const newOpen = [...prev]
+            newOpen[index] = true
+            return newOpen
+          })
+        }, 0)
+      } else {
+        doScrollToCurrentProxy(index)
+      }
+    },
+    [doScrollToCurrentProxy]
+  )
+
+  const onGroupDelayRef = useRef(onGroupDelay)
+  onGroupDelayRef.current = onGroupDelay
+  const onGroupDelayStable = useCallback((i: number) => {
+    onGroupDelayRef.current(i)
+  }, [])
+
+  const scrollToCurrentProxyRef = useRef(scrollToCurrentProxy)
+  scrollToCurrentProxyRef.current = scrollToCurrentProxy
+  const scrollToCurrentProxyStable = useCallback((i: number) => {
+    scrollToCurrentProxyRef.current(i)
+  }, [])
+
+  // stable refs for Virtuoso callbacks
+  const groupsRef = useRef(groups)
+  groupsRef.current = groups
+  const groupDisplayLayoutRef = useRef(groupDisplayLayout)
+  groupDisplayLayoutRef.current = groupDisplayLayout
+  const searchValueRef = useRef(searchValue)
+  searchValueRef.current = searchValue
+  const delayingRef = useRef(delaying)
+  delayingRef.current = delaying
+  const groupCountsRef = useRef(groupCounts)
+  groupCountsRef.current = groupCounts
+  const allProxiesRef = useRef(allProxies)
+  allProxiesRef.current = allProxies
+  const colsRef = useRef(cols)
+  colsRef.current = cols
+  const mutateRef = useRef(mutate)
+  mutateRef.current = mutate
+  const onProxyDelayRef = useRef(onProxyDelay)
+  onProxyDelayRef.current = onProxyDelay
+  const onChangeProxyRef = useRef(onChangeProxy)
+  onChangeProxyRef.current = onChangeProxy
+  const proxyDisplayLayoutRef = useRef(proxyDisplayLayout)
+  proxyDisplayLayoutRef.current = proxyDisplayLayout
+  const showGroupSelectedProxyRef = useRef(showGroupSelectedProxy)
+  showGroupSelectedProxyRef.current = showGroupSelectedProxy
+  const showProxyDetailTooltipRef = useRef(showProxyDetailTooltip)
+  showProxyDetailTooltipRef.current = showProxyDetailTooltip
+  const proxyCols2Ref = useRef(proxyCols)
+  proxyCols2Ref.current = proxyCols
+  const toggleOpenRef = useRef(toggleOpen)
+  toggleOpenRef.current = toggleOpen
+  const updateSearchValueRef = useRef(updateSearchValue)
+  updateSearchValueRef.current = updateSearchValue
+
+  useEffect(() => {
+    groups.forEach((group) => {
+      if (group.icon && group.icon.startsWith('http') && !localStorage.getItem(group.icon)) {
+        getImageDataURL(group.icon).then((dataURL) => {
+          localStorage.setItem(group.icon, dataURL)
+          mutate()
+        })
+      }
+    })
+  }, [groups, mutate])
+
+  useEffect(() => {
+    if (proxyCols !== 'auto') {
+      setCols(parseInt(proxyCols))
+      return
+    }
+    setCols(calcCols())
+    const handleResize = (): void => {
+      setCols(calcCols())
+    }
+    window.addEventListener('resize', handleResize)
+    return (): void => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [proxyCols, calcCols])
+
+  const groupContent = useCallback(
+    (index: number) => {
+      const g = groupsRef.current
+      return g[index] ? (
+        <GroupHeader
+          index={index}
+          group={g[index]}
+          isOpen={isOpen[index]}
+          isLast={index === g.length - 1}
+          groupDisplayLayout={groupDisplayLayoutRef.current}
+          searchValue={searchValueRef.current[index]}
+          delaying={delayingRef.current[index]}
+          onToggle={toggleOpenRef.current}
+          onUpdateSearch={updateSearchValueRef.current}
+          onScrollToProxy={scrollToCurrentProxyStable}
+          onGroupDelay={onGroupDelayStable}
+        />
+      ) : (
+        <div>Never See This</div>
       )
-      .map((p) => p.name)
-    const recommended = findRecommendedNode(
-      candidates,
-      new Map(Object.entries(performance)),
-      excluded
+    },
+    [isOpen, scrollToCurrentProxyStable, onGroupDelayStable]
+  )
+
+  const itemContent = useCallback((index: number, groupIndex: number) => {
+    const gc = groupCountsRef.current
+    const ap = allProxiesRef.current
+    const grps = groupsRef.current
+    const c = colsRef.current
+    const pCols = proxyCols2Ref.current
+    const pLayout = proxyDisplayLayoutRef.current
+    const showGroupSelected = showGroupSelectedProxyRef.current
+    const showTooltip = showProxyDetailTooltipRef.current
+    let innerIndex = index
+    for (let i = 0; i < groupIndex; i++) {
+      innerIndex -= gc[i]
+    }
+    const proxies = ap[groupIndex]
+    const items: ReactNode[] = []
+    for (let i = 0; i < c; i++) {
+      const proxy = proxies[innerIndex * c + i]
+      if (!proxy) continue
+      items.push(
+        <ProxyItem
+          key={proxy.name}
+          mutateProxies={mutateRef.current}
+          onProxyDelay={onProxyDelayRef.current}
+          onSelect={onChangeProxyRef.current}
+          proxy={proxy}
+          group={grps[groupIndex]}
+          proxyDisplayLayout={pLayout}
+          showGroupSelectedProxy={showGroupSelected}
+          showProxyDetailTooltip={showTooltip}
+          selected={proxy.name === grps[groupIndex].now}
+        />
+      )
+    }
+    return proxies ? (
+      <div
+        style={{
+          animation: 'proxy-row-in 0.15s ease both',
+          ...(pCols !== 'auto' ? { gridTemplateColumns: `repeat(${pCols}, minmax(0, 1fr))` } : {})
+        }}
+        className={`grid ${
+          pCols === 'auto'
+            ? 'sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
+            : ''
+        } ${groupIndex === gc.length - 1 && innerIndex === gc[groupIndex] - 1 ? 'pb-2' : ''} gap-2 pt-2 mx-2`}
+      >
+        {items}
+      </div>
+    ) : (
+      <div>Never See This</div>
     )
-    return (
-      <section className="dashboard-panel proxy-group mb-3" key={group.name}>
-        <div className="flex items-center justify-between gap-2">
-          <button
-            className="text-left min-w-0 flex-1"
-            aria-expanded={open}
-            onClick={() => setExpanded((old) => ({ ...old, [group.name]: !open }))}
-          >
-            <div className="font-semibold truncate">
-              {group.name}{' '}
-              <span className="text-xs text-foreground-500">
-                {items.length} · {group.type}
-              </span>
-            </div>
-            <div className="text-xs text-foreground-500 truncate mt-1">
-              {open ? '⌄' : '›'} {group.now || '未选择'}
-            </div>
-          </button>
-          <div className="flex gap-1 shrink-0">
-            {group.fixed && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={async () => {
-                  try {
-                    await mihomoUnfixedProxy(group.name)
-                    mutate()
-                  } catch (e) {
-                    notify(e, { variant: 'danger' })
-                  }
-                }}
-              >
-                取消固定
-              </Button>
-            )}
-            {recommended && recommended !== group.now && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onPress={() => void select(group.name, recommended)}
-              >
-                推荐
-              </Button>
-            )}
-            <Button
-              size="sm"
-              variant="ghost"
-              isDisabled={busy.size > 0}
-              onPress={() => void testGroups([group])}
-            >
-              {busy.has(group.name) ? '测试中…' : '测速'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() => {
-                setExpanded((old) => ({ ...old, [group.name]: true }))
-                setLimits((old) => ({
-                  ...old,
-                  [group.name]: Math.max(limit, items.findIndex((p) => p.name === group.now) + 1)
-                }))
-                setTimeout(
-                  () =>
-                    document
-                      .getElementById(`proxy-${group.name}-${group.now}`)
-                      ?.scrollIntoView({ block: 'center' }),
-                  50
-                )
-              }}
-            >
-              定位
-            </Button>
-          </div>
-        </div>
-        {open && (
-          <div className="mt-3">
-            {layout === 'table' ? (
-              <div className="overflow-auto">
-                <table className="data-table">
-                  <thead>
-                    <tr>
-                      <th>节点</th>
-                      <th>类型</th>
-                      <th>延迟</th>
-                      <th>评分</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.slice(0, limit).map((proxy) => (
-                      <tr
-                        id={`proxy-${group.name}-${proxy.name}`}
-                        key={proxy.name}
-                        data-selected={group.now === proxy.name}
-                      >
-                        <td>
-                          <button onClick={() => void select(group.name, proxy.name)}>
-                            {proxy.name}
-                          </button>
-                        </td>
-                        <td>{proxy.type}</td>
-                        <td>
-                          {delay(proxy) > 0
-                            ? `${delay(proxy)} ms`
-                            : delay(proxy) === 0
-                              ? '超时'
-                              : '未测试'}
-                        </td>
-                        <td>
-                          {performance[proxy.name]
-                            ? calculateNodeScore(performance[proxy.name])
-                            : '—'}
-                        </td>
-                        <td>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onPress={async () => {
-                              try {
-                                await testNode(proxy, group)
-                                mutate()
-                              } catch (e) {
-                                notify(e, { variant: 'danger' })
-                              }
-                            }}
-                          >
-                            测速
-                          </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div
-                className={`grid gap-2 ${layout === 'list' ? 'grid-cols-1' : appConfig?.proxyCols === 'auto' || !appConfig?.proxyCols ? 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3' : ''}`}
-                style={
-                  layout !== 'list' && appConfig?.proxyCols && appConfig.proxyCols !== 'auto'
-                    ? { gridTemplateColumns: `repeat(${appConfig.proxyCols},minmax(0,1fr))` }
-                    : undefined
-                }
-              >
-                {items.slice(0, limit).map((proxy) => (
-                  <div id={`proxy-${group.name}-${proxy.name}`} key={proxy.name}>
-                    <ProxyItem
-                      proxy={proxy}
-                      group={group}
-                      selected={group.now === proxy.name}
-                      onSelect={select}
-                      onProxyDelay={testNode}
-                      mutateProxies={mutate}
-                      proxyDisplayLayout={appConfig?.proxyDisplayLayout ?? 'double'}
-                      showGroupSelectedProxy={appConfig?.showGroupSelectedProxy ?? true}
-                      showProxyDetailTooltip={appConfig?.showProxyDetailTooltip ?? true}
-                    />
-                    <div className="proxy-node-meta">
-                      <span>
-                        {proxy.name === recommended ? '推荐 · ' : ''}
-                        {performance[proxy.name]
-                          ? `评分 ${calculateNodeScore(performance[proxy.name])}`
-                          : ''}
-                      </span>
-                      <button
-                        className="proxy-exclude"
-                        onClick={() =>
-                          setExcluded((old) =>
-                            old.includes(proxy.name)
-                              ? old.filter((name) => name !== proxy.name)
-                              : [...old, proxy.name]
-                          )
-                        }
-                      >
-                        {excluded.includes(proxy.name) ? '允许推荐' : '排除推荐'}
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            {!items.length && <p className="dashboard-empty">没有符合筛选条件的节点</p>}
-            {items.length > limit && (
-              <Button
-                className="mt-3"
-                size="sm"
-                variant="ghost"
-                onPress={() => setLimits((old) => ({ ...old, [group.name]: limit + 50 }))}
-              >
-                显示更多（{limit} / {items.length}）
-              </Button>
-            )}
-          </div>
-        )}
-      </section>
-    )
-  }
+  }, [])
+
   return (
     <BasePage
-      title="代理"
-      contentClassName="proxy-content flex flex-col overflow-hidden"
+      title="代理组"
       header={
         <div className="flex gap-1 app-nodrag">
           <Button
@@ -427,143 +718,55 @@ export default function Proxies() {
             variant={tab === 'providers' ? 'primary' : 'ghost'}
             onPress={() => setTab('providers')}
           >
-            代理集合
+            代理提供者
           </Button>
-          <Button size="sm" variant="ghost" onPress={() => setConnectivity(true)}>
-            连通性
-          </Button>
-          <Button size="sm" variant="ghost" onPress={() => setSettings(true)}>
-            设置
+          <Button
+            size="sm"
+            isIconOnly
+            onPress={() => {
+              setIsSettingDrawerOpen(true)
+              setSettingDrawerReopenSignal((signal) => signal + 1)
+            }}
+            variant="ghost"
+            data-color="default"
+            className="app-nodrag"
+          >
+            <MdTune className="text-lg" />
           </Button>
         </div>
       }
     >
-      {connectivity && <ConnectivityBoard onClose={() => setConnectivity(false)} />}
-      {settings && <ProxySettingDrawer onClose={() => setSettings(false)} />}
+      {isSettingDrawerOpen && (
+        <ProxySettingDrawer
+          reopenSignal={settingDrawerReopenSignal}
+          onClose={() => setIsSettingDrawerOpen(false)}
+        />
+      )}
       {tab === 'providers' ? (
-        <div className="overflow-auto">
-          <ProxyProvider />
+        <ProxyProvider />
+      ) : mode === 'direct' ? (
+        <div className="h-full w-full flex justify-center items-center">
+          <div className="flex flex-col items-center">
+            <MdDoubleArrow className="text-foreground-500 text-[100px]" />
+            <h2 className="text-foreground-500 text-[20px]">直连模式</h2>
+          </div>
         </div>
       ) : (
-        <>
-          <div className="proxy-toolbar">
-            <InputGroup className="min-w-40 flex-1">
-              <InputGroup.Input
-                aria-label="搜索代理"
-                placeholder="搜索代理组或节点…"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-              />
-            </InputGroup>
-            <select
-              className="dashboard-select"
-              aria-label="节点排序"
-              value={sort}
-              onChange={(e) =>
-                void patchAppConfig({
-                  proxyDisplayOrder: e.target.value as 'default' | 'delay' | 'name'
-                })
-              }
-            >
-              <option value="default">原始顺序</option>
-              <option value="delay">延迟</option>
-              <option value="name">名称</option>
-            </select>
-            <select
-              className="dashboard-select"
-              aria-label="可用性"
-              value={availability}
-              onChange={(e) => setAvailability(e.target.value)}
-            >
-              <option value="all">全部节点</option>
-              <option value="alive">可用节点</option>
-              <option value="dead">不可用节点</option>
-            </select>
-            <select
-              className="dashboard-select"
-              aria-label="代理布局"
-              value={layout}
-              onChange={(e) => setLayout(e.target.value)}
-            >
-              {[
-                ['card', '卡片'],
-                ['list', '列表'],
-                ['table', '表格'],
-                ['master', '分栏']
-              ].map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <Button
-              size="sm"
-              variant="ghost"
-              onPress={() =>
-                setExpanded(
-                  Object.fromEntries(
-                    renderedGroups.map((group) => [
-                      group.name,
-                      !renderedGroups.some((g) => expanded[g.name])
-                    ])
-                  )
-                )
-              }
-            >
-              展开 / 折叠全部
-            </Button>
-            <Button
-              size="sm"
-              variant="primary"
-              isDisabled={busy.size > 0}
-              onPress={() => void testGroups(renderedGroups)}
-            >
-              {progress ? `${progress.complete} / ${progress.total}` : '全部测速'}
-            </Button>
-            <label className="text-xs flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={autoSwitch}
-                onChange={(e) => setAutoSwitch(e.target.checked)}
-              />
-              自动选优
-            </label>
-          </div>
-          {controledMihomoConfig?.mode === 'direct' ? (
-            <div className="dashboard-empty">直连模式</div>
-          ) : !renderedGroups.length ? (
-            <div className="dashboard-empty">
-              {filter
-                ? '没有匹配的代理组，请调整搜索条件。'
-                : '暂无代理组，请先在订阅管理中导入并启用配置。'}
-            </div>
-          ) : layout === 'master' ? (
-            <div className="flex min-h-0 flex-1">
-              <div className="w-44 shrink-0 overflow-auto border-r border-border p-2">
-                {renderedGroups.map((group) => (
-                  <button
-                    className={`w-full text-left p-2 rounded-lg text-sm ${selectedGroup?.name === group.name ? 'bg-primary/15 text-primary' : ''}`}
-                    key={group.name}
-                    onClick={() => setActiveGroup(group.name)}
-                  >
-                    {group.name}
-                    <span className="block truncate text-xs text-foreground-500">{group.now}</span>
-                  </button>
-                ))}
-              </div>
-              <div className="flex-1 min-w-0 overflow-auto p-3">
-                {selectedGroup && groupView(selectedGroup, true)}
-              </div>
-            </div>
-          ) : (
-            <Virtuoso
-              className="flex-1"
-              data={renderedGroups}
-              itemContent={(_index, group) => <div className="px-3 pt-3">{groupView(group)}</div>}
-            />
-          )}
-        </>
+        <div className="h-[calc(100vh-50px)]">
+          <GroupedVirtuoso
+            ref={virtuosoRef}
+            scrollerRef={scrollerRef}
+            initialScrollTop={initialScrollTop}
+            groupCounts={groupCounts}
+            groupContent={groupContent}
+            itemContent={itemContent}
+            defaultItemHeight={72}
+            overscan={200}
+          />
+        </div>
       )}
     </BasePage>
   )
 }
+
+export default Proxies

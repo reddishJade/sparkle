@@ -26,7 +26,12 @@ export class UsageJournal {
       .filter((record) => record.time === this.bucketMinute)
       .forEach((record) => {
         this.buckets.set(
-          JSON.stringify([record.time, record.id, ...dimensions.map((d) => record[d])]),
+          JSON.stringify([
+            record.time,
+            record.instanceId,
+            record.id,
+            ...dimensions.map((d) => record[d])
+          ]),
           record
         )
       })
@@ -43,6 +48,7 @@ export class UsageJournal {
       this.data.instanceId = instanceId
     }
     const first = !this.data.initialized || changed
+    if (first || !this.data.sessionStartedAt) this.data.sessionStartedAt = now
     const next: UsageStorage['baseline'] = Object.fromEntries(
       Object.entries(this.data.baseline).filter(
         ([, counter]) => now - (counter.lastSeen ?? now) <= 5000
@@ -66,6 +72,7 @@ export class UsageJournal {
       if (!upload && !download) continue
       const meta = connection.metadata
       const record: UsageRecord = {
+        instanceId,
         time: Math.floor(now / 60000) * 60000,
         id: connection.id,
         sourceIP: meta.sourceIP || '未知设备',
@@ -77,7 +84,12 @@ export class UsageJournal {
         upload,
         download
       }
-      const key = JSON.stringify([record.time, record.id, ...dimensions.map((d) => record[d])])
+      const key = JSON.stringify([
+        record.time,
+        record.instanceId,
+        record.id,
+        ...dimensions.map((d) => record[d])
+      ])
       const existing = this.buckets.get(key)
       if (existing) {
         existing.upload += upload
@@ -115,9 +127,13 @@ export class UsageJournal {
       !dimensions.includes(query.dimension)
     )
       throw new Error('无效的用量查询')
+    const start = query.session
+      ? Math.floor((this.data.sessionStartedAt ?? query.end) / 60000) * 60000
+      : query.start
     const filtered = this.data.records.filter(
       (record) =>
-        record.time >= query.start &&
+        (!query.session || record.instanceId === this.data.instanceId) &&
+        record.time >= start &&
         record.time <= query.end &&
         Object.entries(query.filters ?? {}).every(
           ([key, value]) => dimensions.includes(key as UsageDimension) && record[key] === value
@@ -126,7 +142,7 @@ export class UsageJournal {
     const entries = new Map<string, UsageEntry>()
     const ids = new Map<string, Set<string>>()
     const trends = new Map<number, { time: number; upload: number; download: number }>()
-    const span = query.end - query.start
+    const span = query.end - start
     const bucket =
       span <= 3600000 ? 60000 : span <= 86400000 ? 300000 : span <= 604800000 ? 3600000 : 86400000
     let totalUpload = 0,
@@ -138,7 +154,7 @@ export class UsageJournal {
       entry.download += record.download
       entry.total += record.upload + record.download
       const connections = ids.get(label) ?? new Set<string>()
-      connections.add(record.id)
+      connections.add(JSON.stringify([record.instanceId, record.id]))
       ids.set(label, connections)
       entry.count = connections.size
       entries.set(label, entry)
@@ -151,7 +167,7 @@ export class UsageJournal {
       trends.set(time, trend)
     }
     const trend: UsageResult['trend'] = []
-    for (let time = Math.floor(query.start / bucket) * bucket; time <= query.end; time += bucket) {
+    for (let time = Math.floor(start / bucket) * bucket; time <= query.end; time += bucket) {
       trend.push(trends.get(time) ?? { time, upload: 0, download: 0 })
       if (trend.length >= 1000) break
     }
@@ -160,7 +176,7 @@ export class UsageJournal {
       trend,
       totalUpload,
       totalDownload,
-      count: new Set(filtered.map((r) => r.id)).size,
+      count: new Set(filtered.map((r) => JSON.stringify([r.instanceId, r.id]))).size,
       retention: this.data.retention,
       startedAt: this.data.startedAt
     }

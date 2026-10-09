@@ -1,5 +1,6 @@
 import { Button, Spinner, Select, Switch, Tabs, ListBox } from '@heroui/react'
 
+import GeoData from '@renderer/components/mihomo/geo-data'
 import BasePage from '@renderer/components/base/base-page'
 import SettingCard from '@renderer/components/base/base-setting-card'
 import SettingItem from '@renderer/components/base/base-setting-item'
@@ -486,6 +487,7 @@ const Mihomo: React.FC = () => {
           </Button>
         </SettingItem>
       </SettingCard>
+      <GeoData />
       <PortSetting />
       <ControllerSetting />
       <EnvSetting />

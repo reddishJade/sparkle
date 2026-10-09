@@ -1,5 +1,6 @@
 // Network probes adapted from metacubexd; see licenses/metacubexd-MIT.txt.
 import { getNetworkInfo, getNetworkLatencies } from '@renderer/utils/ipc'
+import DashboardSelect from '@renderer/components/base/dashboard-select'
 import { Button } from '@heroui/react'
 import { useEffect, useRef, useState } from 'react'
 const providers = {
@@ -56,20 +57,17 @@ export default function NetworkInfo() {
         <div className="flex items-center justify-between gap-2">
           <h2>出口 IP</h2>
           <div className="flex gap-2">
-            <select
-              className="dashboard-select"
-              aria-label="IP 查询服务"
+            <DashboardSelect
+              label="IP 查询服务"
+              className="w-28"
               value={provider}
-              onChange={(event) => {
-                const next = event.target.value as keyof typeof providers
+              options={Object.keys(providers).map((name) => [name, name])}
+              onChange={(value) => {
+                const next = value as keyof typeof providers
                 setProvider(next)
                 void fetchIP(next)
               }}
-            >
-              {Object.keys(providers).map((name) => (
-                <option key={name}>{name}</option>
-              ))}
-            </select>
+            />
             <Button size="sm" variant="ghost" isDisabled={loading} onPress={() => void fetchIP()}>
               刷新
             </Button>

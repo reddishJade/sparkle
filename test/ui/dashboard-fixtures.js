@@ -231,7 +231,7 @@ window.electron = {
             count: 10 * (i + 1)
           })),
           trend: Array.from({ length: 12 }, (_, i) => ({
-            time: q.start + i * 60000,
+            time: (q.session ? Date.now() - 11 * 60000 : q.start) + i * 60000,
             upload: 200000 + i * 10000,
             download: 400000 + i * 20000
           })),

@@ -94,6 +94,7 @@ export interface TrafficStatsSummary {
 
 export type UsageDimension = 'sourceIP' | 'inboundUser' | 'host' | 'outbound' | 'process'
 export interface UsageRecord {
+  instanceId?: string
   time: number
   id: string
   sourceIP: string
@@ -105,6 +106,7 @@ export interface UsageRecord {
   download: number
 }
 export interface UsageStorage {
+  sessionStartedAt?: number
   records: UsageRecord[]
   retention: number
   instanceId?: string
@@ -113,6 +115,7 @@ export interface UsageStorage {
   initialized?: boolean
 }
 export interface UsageQuery {
+  session?: boolean
   start: number
   end: number
   dimension: UsageDimension

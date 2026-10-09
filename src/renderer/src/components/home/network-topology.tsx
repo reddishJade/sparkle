@@ -1,5 +1,5 @@
 import { Button } from '@heroui/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildTopology, type TopologyNode } from './topology-data'
 import { calcTraffic } from '@renderer/utils/calc'
 
@@ -19,6 +19,15 @@ export default function NetworkTopology({
   const [frozen, setFrozen] = useState<ControllerConnectionDetail[] | null>(null)
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   const [zoom, setZoom] = useState(1)
+  const panelRef = useRef<HTMLElement>(null)
+  const [availableWidth, setAvailableWidth] = useState(0)
+  useEffect(() => {
+    const element = panelRef.current
+    if (!element) return
+    const observer = new ResizeObserver(() => setAvailableWidth(element.clientWidth - 34))
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
   const [selected, setSelected] = useState<TopologyNode>()
   const tree = useMemo(() => buildTopology(frozen ?? connections), [frozen, connections])
   const { nodes, links, height, width } = useMemo(() => {
@@ -31,21 +40,22 @@ export default function NetworkTopology({
       const y = children.length
         ? (children[0].y + children[children.length - 1].y) / 2
         : row++ * 76 + 38
-      const x = depth * 220 + 20
+      const x = depth * 180 + 16
       nodes.push({ node, x, y, expanded })
-      children.forEach((child) => links.push({ x1: x + 180, y1: y, x2: child.x, y2: child.y }))
+      children.forEach((child) => links.push({ x1: x + 154, y1: y, x2: child.x, y2: child.y }))
       return { x, y }
     }
     walk(tree, 0)
     return {
       nodes,
       links,
-      height: Math.max(240, row * 76 + 20),
-      width: Math.max(...nodes.map(({ x }) => x + 200))
+      height: Math.max(200, row * 76 + 20),
+      width: Math.max(...nodes.map(({ x }) => x + 170))
     }
   }, [tree, overrides])
+  const scale = Math.min(1, availableWidth > 0 ? availableWidth / width : 1) * zoom
   return (
-    <section className="dashboard-panel topology-panel">
+    <section ref={panelRef} className="dashboard-panel topology-panel">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h2>网络拓扑</h2>
@@ -94,18 +104,21 @@ export default function NetworkTopology({
         <div className="dashboard-empty">暂无活动连接。产生代理流量后，拓扑会自动更新。</div>
       ) : (
         <div className="topology-viewport">
-          <div className="topology-columns" style={{ width: width * zoom }}>
+          <div
+            className="topology-columns"
+            style={{ width: width * scale, paddingInline: 16 * scale }}
+          >
             {['连接', '策略组', '节点', '规则', '设备', '端口']
-              .slice(0, Math.round(width / 220))
+              .slice(0, Math.round(width / 180))
               .map((label) => (
-                <span key={label} style={{ width: 220 * zoom }}>
+                <span key={label} style={{ width: 180 * scale }}>
                   {label}
                 </span>
               ))}
           </div>
           <svg
-            width={width * zoom}
-            height={height * zoom}
+            width={width * scale}
+            height={height * scale}
             viewBox={`0 0 ${width} ${height}`}
             aria-label="实时网络拓扑"
           >
@@ -119,7 +132,7 @@ export default function NetworkTopology({
               />
             ))}
             {nodes.map(({ node, x, y, expanded }) => (
-              <foreignObject key={node.id} x={x} y={y - 28} width="180" height="60">
+              <foreignObject key={node.id} x={x} y={y - 28} width="154" height="60">
                 <button
                   type="button"
                   className={`topology-node ${selected?.id === node.id ? 'selected' : ''}`}

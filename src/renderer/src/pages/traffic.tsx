@@ -2,12 +2,23 @@
 import { Button, InputGroup } from '@heroui/react'
 import { useEffect, useMemo, useState } from 'react'
 import useSWR from 'swr'
+import DashboardSelect from '@renderer/components/base/dashboard-select'
 import BasePage from '@renderer/components/base/base-page'
 import ConfirmModal from '@renderer/components/base/base-confirm'
 import HistoryChart from '@renderer/components/home/history-chart'
 import { calcTraffic } from '@renderer/utils/calc'
 import { clearTrafficStats, getUsage, setUsageRetention } from '@renderer/utils/ipc'
 import { notify } from '@renderer/utils/notification'
+import {
+  FiArrowUp,
+  FiArrowDown,
+  FiLayers,
+  FiMonitor,
+  FiUsers,
+  FiGlobe,
+  FiShuffle,
+  FiCpu
+} from 'react-icons/fi'
 import type { UsageDimension, UsageEntry, UsageQuery } from '../../../shared/types/traffic'
 import { downloadText, csvField } from '@renderer/utils/download'
 
@@ -18,10 +29,18 @@ const views: Array<[UsageDimension, string]> = [
   ['outbound', '节点'],
   ['process', '进程']
 ]
+const viewIcons = {
+  sourceIP: FiMonitor,
+  inboundUser: FiUsers,
+  host: FiGlobe,
+  outbound: FiShuffle,
+  process: FiCpu
+}
 const ranges = [
+  [0, '本次运行'],
   [3600000, '最近一小时'],
-  [86400000, '最近一天'],
-  [604800000, '最近一周'],
+  [86400000, '最近 1 天'],
+  [604800000, '最近 7 日'],
   [2592000000, '最近一月'],
   [-1, '自定义']
 ] as const
@@ -40,7 +59,7 @@ export default function UsagePage() {
   const [dimension, setDimension] = useState<UsageDimension>(() =>
     preference('usage-view', 'sourceIP')
   )
-  const [range, setRange] = useState<number>(() => preference('usage-range', 3600000))
+  const [range, setRange] = useState<number>(() => preference('usage-range', 0))
   const [start, setStart] = useState(() =>
     preference('usage-start', dateInput(Date.now() - 86400000))
   )
@@ -55,7 +74,8 @@ export default function UsagePage() {
   const [pendingRetention, setPendingRetention] = useState<number | null>(null)
   const query = useMemo<UsageQuery>(
     () => ({
-      start: range === -1 ? new Date(start).getTime() : now - range,
+      session: range === 0,
+      start: range === -1 ? new Date(start).getTime() : range === 0 ? 0 : now - range,
       end: range === -1 ? new Date(end).getTime() : now,
       dimension
     }),
@@ -170,50 +190,47 @@ export default function UsagePage() {
       }
     >
       <div className="dashboard-content usage-content">
-        <div className="flex flex-wrap gap-2 items-center">
-          {views.map(([id, name]) => (
-            <Button
-              key={id}
-              size="sm"
-              variant={dimension === id ? 'primary' : 'ghost'}
-              onPress={() => setDimension(id)}
-            >
-              {name}
-            </Button>
-          ))}
+        <div className="usage-toolbar">
+          <div className="usage-tabs">
+            {views.map(([id, name]) => {
+              const Icon = viewIcons[id]
+              return (
+                <Button
+                  key={id}
+                  size="sm"
+                  variant={dimension === id ? 'primary' : 'ghost'}
+                  onPress={() => setDimension(id)}
+                >
+                  <Icon />
+                  {name}
+                </Button>
+              )
+            })}
+          </div>
           <div className="flex-1" />
-          <select
-            className="dashboard-select"
-            aria-label="时间范围"
-            value={range}
-            onChange={(e) => setRange(Number(e.target.value))}
-          >
-            {ranges.map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <select
-            className="dashboard-select"
-            aria-label="数据保留时长"
-            value={data?.retention ?? 2592000000}
-            onChange={(e) => {
-              const value = Number(e.target.value)
+          <DashboardSelect
+            label="时间范围"
+            value={String(range)}
+            options={ranges.map(([id, name]) => [String(id), name])}
+            onChange={(value) => setRange(Number(value))}
+          />
+          <DashboardSelect
+            label="数据保留时长"
+            value={String(data?.retention ?? 2592000000)}
+            options={[
+              ['-1', '永久保留'],
+              ['3600000', '保留 1 小时'],
+              ['86400000', '保留 1 天'],
+              ['604800000', '保留 7 日'],
+              ['2592000000', '保留 1 月']
+            ]}
+            onChange={(next) => {
+              const value = Number(next)
               if (value > 0 && (data?.retention === -1 || value < (data?.retention ?? Infinity)))
                 setPendingRetention(value)
               else void changeRetention(value)
             }}
-          >
-            <option value={-1}>永久保留</option>
-            {ranges
-              .filter(([id]) => id !== -1)
-              .map(([id, name]) => (
-                <option key={id} value={id}>
-                  保留{name.replace('最近', '')}
-                </option>
-              ))}
-          </select>
+          />
         </div>
         {range === -1 && (
           <div className="flex flex-wrap gap-2">
@@ -250,43 +267,103 @@ export default function UsagePage() {
             </Button>
           </p>
         )}
-        <div className="dashboard-metrics metric-strip usage-metrics">
+        <div className="usage-summary">
           {[
-            ['总用量', calcTraffic((data?.totalUpload ?? 0) + (data?.totalDownload ?? 0))],
-            ['上传', calcTraffic(data?.totalUpload ?? 0)],
-            ['下载', calcTraffic(data?.totalDownload ?? 0)],
-            ['连接', data?.count ?? 0],
-            ['统计项目', data?.entries.length ?? 0]
-          ].map(([name, value]) => (
-            <div key={name} className="dashboard-panel">
-              <div className="text-xs text-foreground-500 mb-2">{name}</div>
-              <div className="text-lg font-semibold tabular-nums">{value}</div>
+            {
+              name: label,
+              value: data?.entries.length ?? 0,
+              Icon: viewIcons[dimension],
+              tone: 'accent'
+            },
+            {
+              name: '上传',
+              value: calcTraffic(data?.totalUpload ?? 0),
+              Icon: FiArrowUp,
+              tone: 'success'
+            },
+            {
+              name: '下载',
+              value: calcTraffic(data?.totalDownload ?? 0),
+              Icon: FiArrowDown,
+              tone: 'accent'
+            },
+            {
+              name: '总量',
+              value: calcTraffic((data?.totalUpload ?? 0) + (data?.totalDownload ?? 0)),
+              Icon: FiLayers,
+              tone: 'foreground'
+            }
+          ].map(({ name, value, Icon, tone }) => (
+            <div key={name} className="dashboard-panel usage-summary-item">
+              <span className="usage-summary-icon" style={{ color: `var(--${tone})` }}>
+                <Icon />
+              </span>
+              <div>
+                <span className="usage-summary-label">{name}</span>
+                <strong>{value}</strong>
+              </div>
             </div>
           ))}
         </div>
-        <section className="dashboard-panel">
-          <h2>流量趋势</h2>
-          <HistoryChart
-            timestamps={data?.trend.map((point) => point.time)}
-            series={[
-              data?.trend.map((p) => p.download) ?? [],
-              data?.trend.map((p) => p.upload) ?? []
-            ]}
-            labels={['下载', '上传']}
-            format={calcTraffic}
-          />
-          <p className="usage-period text-xs text-foreground-500">
-            {valid
-              ? `${new Date(query.start).toLocaleString()} — ${new Date(query.end).toLocaleString()}`
-              : '—'}{' '}
-            <span
-              title={`历史数据从 ${data?.startedAt ? new Date(data.startedAt).toLocaleString() : '首次运行'} 开始采集`}
-            >
-              按分钟记录
-            </span>
-          </p>
-        </section>
-        <div className="usage-layout">
+        <div className="usage-workspace">
+          <section className="dashboard-panel usage-popular">
+            <h2>
+              <FiMonitor />
+              热门{label}
+            </h2>
+            {rows.slice(0, 8).map((entry) => (
+              <button
+                key={entry.label}
+                className="usage-popular-row"
+                data-selected={selected === entry.label}
+                onClick={() => {
+                  setSelected(entry.label)
+                  setSubselected(null)
+                }}
+              >
+                <span className="flex justify-between gap-2">
+                  <span className="truncate">{entry.label}</span>
+                  <strong>{calcTraffic(entry.total)}</strong>
+                </span>
+                <span className="usage-share">
+                  <i
+                    style={{
+                      width: `${(entry.total / Math.max(1, ...rows.map((row) => row.total))) * 100}%`
+                    }}
+                  />
+                </span>
+              </button>
+            ))}
+            {!rows.length && (
+              <p className="dashboard-empty">{isLoading ? '正在读取…' : '暂无数据'}</p>
+            )}
+          </section>
+          <section className="dashboard-panel usage-trend">
+            <h2>流量</h2>
+            <HistoryChart
+              timestamps={data?.trend.map((point) => point.time)}
+              series={[
+                data?.trend.map((p) => p.download) ?? [],
+                data?.trend.map((p) => p.upload) ?? []
+              ]}
+              labels={['下载', '上传']}
+              format={calcTraffic}
+            />
+            <p className="usage-period text-xs text-foreground-500">
+              {valid
+                ? range === 0
+                  ? '本次内核运行'
+                  : `${new Date(query.start).toLocaleString()} — ${new Date(query.end).toLocaleString()}`
+                : '—'}{' '}
+              <span
+                title={`历史数据从 ${data?.startedAt ? new Date(data.startedAt).toLocaleString() : '首次运行'} 开始采集`}
+              >
+                按分钟记录
+              </span>
+            </p>
+          </section>
+        </div>
+        <div className={`usage-layout ${selected === null ? 'usage-layout-single' : ''}`}>
           <section className="dashboard-panel">
             <div className="flex justify-between items-center gap-2">
               <h2>{label}用量</h2>
@@ -320,66 +397,84 @@ export default function UsagePage() {
               <p className="dashboard-empty">{isLoading ? '正在读取…' : '此时间范围内暂无记录'}</p>
             )}
           </section>
-          <section className="dashboard-panel">
-            <h2>
-              {selected ?? '详情'}
-              {selected !== null ? ` · ${subDimension === 'host' ? '域名' : '设备'}` : ''}
-            </h2>
-            {selected === null ? (
-              <p className="dashboard-empty">选择左侧项目，查看域名、设备和节点明细。</p>
-            ) : (
-              <>
-                <UsageTable
-                  entries={sub?.entries ?? []}
-                  selected={subselected}
-                  onSelect={setSubselected}
-                />
-                {subselected !== null && (
-                  <div className="mt-4">
-                    <h2>
-                      {subselected} · {detailDimension === 'sourceIP' ? '设备' : '节点'}
-                    </h2>
-                    <UsageTable entries={detail?.entries ?? []} />
-                  </div>
-                )}
-              </>
-            )}
-          </section>
-        </div>
-        <div className="dashboard-grid">
-          <section className="dashboard-panel">
-            <h2>上传排行</h2>
-            {[...(data?.entries ?? [])]
-              .sort((a, b) => b.upload - a.upload)
-              .slice(0, 5)
-              .map((entry) => (
-                <button
-                  className="dashboard-rank"
-                  key={entry.label}
-                  onClick={() => setSelected(entry.label)}
+          {selected !== null && (
+            <section className="dashboard-panel">
+              <div className="flex justify-between items-start gap-2">
+                <h2>
+                  {selected ?? '详情'}
+                  {selected !== null ? ` · ${subDimension === 'host' ? '域名' : '设备'}` : ''}
+                </h2>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label="关闭用量详情"
+                  onPress={() => {
+                    setSelected(null)
+                    setSubselected(null)
+                  }}
                 >
-                  <span className="truncate">{entry.label}</span>
-                  <span>{calcTraffic(entry.upload)}</span>
-                </button>
-              ))}
-          </section>
-          <section className="dashboard-panel">
-            <h2>下载排行</h2>
-            {[...(data?.entries ?? [])]
-              .sort((a, b) => b.download - a.download)
-              .slice(0, 5)
-              .map((entry) => (
-                <button
-                  className="dashboard-rank"
-                  key={entry.label}
-                  onClick={() => setSelected(entry.label)}
-                >
-                  <span className="truncate">{entry.label}</span>
-                  <span>{calcTraffic(entry.download)}</span>
-                </button>
-              ))}
-          </section>
+                  ×
+                </Button>
+              </div>
+              {selected === null ? (
+                <p className="dashboard-empty">选择左侧项目，查看域名、设备和节点明细。</p>
+              ) : (
+                <>
+                  <UsageTable
+                    entries={sub?.entries ?? []}
+                    selected={subselected}
+                    onSelect={setSubselected}
+                  />
+                  {subselected !== null && (
+                    <div className="mt-4">
+                      <h2>
+                        {subselected} · {detailDimension === 'sourceIP' ? '设备' : '节点'}
+                      </h2>
+                      <UsageTable entries={detail?.entries ?? []} />
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+          )}
         </div>
+        <details className="usage-rankings">
+          <summary>上传 / 下载排行</summary>
+          <div className="dashboard-grid">
+            <section className="dashboard-panel">
+              <h2>上传排行</h2>
+              {[...(data?.entries ?? [])]
+                .sort((a, b) => b.upload - a.upload)
+                .slice(0, 5)
+                .map((entry) => (
+                  <button
+                    className="dashboard-rank"
+                    key={entry.label}
+                    onClick={() => setSelected(entry.label)}
+                  >
+                    <span className="truncate">{entry.label}</span>
+                    <span>{calcTraffic(entry.upload)}</span>
+                  </button>
+                ))}
+            </section>
+            <section className="dashboard-panel">
+              <h2>下载排行</h2>
+              {[...(data?.entries ?? [])]
+                .sort((a, b) => b.download - a.download)
+                .slice(0, 5)
+                .map((entry) => (
+                  <button
+                    className="dashboard-rank"
+                    key={entry.label}
+                    onClick={() => setSelected(entry.label)}
+                  >
+                    <span className="truncate">{entry.label}</span>
+                    <span>{calcTraffic(entry.download)}</span>
+                  </button>
+                ))}
+            </section>
+          </div>
+        </details>
       </div>
       {clearOpen && (
         <ConfirmModal

@@ -111,3 +111,24 @@ describe('Usage journal', () => {
     assert.equal(query(journal).entries.length, 0)
   })
 })
+
+it('keeps current-run usage separate across core restarts within the same minute', () => {
+  const journal = new UsageJournal()
+  journal.feed(snapshot(), time, 'first')
+  journal.feed(snapshot(connection('same-id', 10, 20)), time + 1000, 'first')
+  journal.feed(snapshot(), time + 2000, 'second')
+  journal.feed(snapshot(connection('same-id', 30, 40)), time + 3000, 'second')
+  const request = {
+    start: time - 60000,
+    end: time + 60000,
+    dimension: 'sourceIP' as const,
+    session: true
+  }
+  assert.equal(journal.query(request).totalUpload, 30)
+  assert.equal(journal.query(request).totalDownload, 40)
+  assert.equal(query(journal).totalUpload, 40)
+  const restored = new UsageJournal(JSON.parse(JSON.stringify(journal.serialize())))
+  assert.equal(restored.query(request).totalUpload, 30)
+  restored.feed(snapshot(connection('same-id', 35, 45)), time + 4000, 'second')
+  assert.equal(restored.query(request).totalUpload, 35)
+})
