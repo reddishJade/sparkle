@@ -1,15 +1,18 @@
 .dashboard-content {
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+  container: dashboard / inline-size;
+  min-height: 100%;
+  background: color-mix(in srgb, var(--surface-secondary) 45%, var(--background));
 }
 .dashboard-panel {
   min-width: 0;
-  border: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
   background: var(--surface);
   border-radius: 14px;
-  padding: 14px;
+  padding: 16px;
 }
 .dashboard-panel h2 {
   font-size: 14px;
@@ -56,8 +59,10 @@
   overflow: auto;
   max-height: 560px;
   border-radius: 10px;
-  background: var(--background);
-  border: 1px solid var(--border);
+  background-color: color-mix(in srgb, var(--surface-secondary) 35%, var(--surface));
+  background-image: radial-gradient(var(--border) 0.65px, transparent 0.65px);
+  background-size: 16px 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
 }
 .topology-node {
   width: 178px;
@@ -84,11 +89,11 @@
   display: flex;
   align-items: center;
   gap: 18px;
-  min-height: 175px;
+  min-height: 110px;
 }
 .distribution-ring {
-  width: 110px;
-  height: 110px;
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -97,8 +102,8 @@
 .distribution-ring span {
   background: var(--surface);
   border-radius: 50%;
-  width: 82px;
-  height: 82px;
+  width: 58px;
+  height: 58px;
   display: grid;
   place-items: center;
   font-size: 12px;
@@ -167,5 +172,214 @@
   }
   .dashboard-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.home-status {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.home-status-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.home-status-label i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--default-400);
+}
+.home-status-label.is-connected i {
+  background: var(--success);
+}
+.metric-strip {
+  gap: 0;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+  overflow: hidden;
+}
+.metric-strip .dashboard-panel {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 14px 16px;
+  position: relative;
+}
+.metric-strip .dashboard-panel::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 18px;
+  bottom: 18px;
+  width: 1px;
+  background: color-mix(in srgb, var(--border) 55%, transparent);
+}
+.metric-strip .dashboard-panel:last-child::after {
+  display: none;
+}
+.metric-strip .text-lg {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+}
+.home-charts,
+.home-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-charts > :first-child {
+  grid-column: 1 / -1;
+}
+.home-charts .history-chart svg {
+  height: 64px;
+  margin-block: 8px;
+}
+.home-charts > :first-child .history-chart svg {
+  height: 84px;
+}
+.home-charts .dashboard-panel {
+  padding: 12px 16px;
+}
+.home-details > :last-child {
+  grid-column: 1 / -1;
+}
+.topology-columns {
+  display: flex;
+  padding: 12px 20px 0;
+  box-sizing: content-box;
+  color: var(--muted);
+  font-size: 11px;
+}
+.topology-columns span {
+  flex-shrink: 0;
+}
+.topology-node {
+  box-shadow: 0 2px 4px color-mix(in srgb, var(--foreground) 4%, transparent);
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.topology-node-kind {
+  font-size: 14px;
+  color: var(--muted);
+}
+.topology-panel h2 {
+  margin-bottom: 4px;
+}
+.usage-metrics {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.usage-period {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+}
+.usage-content .history-chart svg {
+  height: 120px;
+}
+.usage-content .data-table th {
+  background: color-mix(in srgb, var(--surface-secondary) 60%, var(--surface));
+}
+.proxy-content {
+  background: color-mix(in srgb, var(--surface-secondary) 45%, var(--background));
+}
+.proxy-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.proxy-toolbar > :first-child {
+  flex-basis: 100%;
+}
+.proxy-toolbar > label {
+  margin-left: auto;
+  color: var(--muted);
+}
+.proxy-group > :first-child {
+  padding-bottom: 4px;
+}
+.proxy-node-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 11px;
+  color: var(--muted);
+  padding-inline: 4px;
+}
+.proxy-exclude {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.proxy-node-meta:hover .proxy-exclude,
+.proxy-exclude:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .proxy-exclude {
+    opacity: 1;
+  }
+}
+@container dashboard (min-width: 760px) {
+  .metric-strip {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .usage-metrics {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .home-charts {
+    grid-template-columns: minmax(0, 1.6fr) repeat(2, minmax(0, 1fr));
+  }
+  .home-charts > :first-child {
+    grid-column: auto;
+  }
+  .home-charts .history-chart svg,
+  .home-charts > :first-child .history-chart svg {
+    height: 96px;
+  }
+  .home-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-details > :last-child {
+    grid-column: auto;
+  }
+}
+@container dashboard (max-width: 759px) {
+  .metric-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .metric-strip .text-lg {
+    font-size: 17px;
+  }
+  .metric-strip .dashboard-panel {
+    padding: 10px 12px;
+  }
+  .home-content .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .distribution {
+    gap: 10px;
+  }
+  .distribution .text-sm {
+    font-size: 11px;
+  }
+}
+@container dashboard (max-width: 450px) {
+  .home-details,
+  .home-content .dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

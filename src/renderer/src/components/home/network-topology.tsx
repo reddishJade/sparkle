@@ -45,12 +45,12 @@ export default function NetworkTopology({
     }
   }, [tree, overrides])
   return (
-    <section className="dashboard-panel">
+    <section className="dashboard-panel topology-panel">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h2>网络拓扑</h2>
           <p className="text-xs text-foreground-500">
-            策略组 → 节点 → 规则 → 设备 → 端口 · {tree.count} 条连接 · {calcTraffic(tree.traffic)}
+            {tree.count} 条活动连接 · {calcTraffic(tree.traffic)}
           </p>
         </div>
         <div className="flex gap-1">
@@ -94,6 +94,15 @@ export default function NetworkTopology({
         <div className="dashboard-empty">暂无活动连接。产生代理流量后，拓扑会自动更新。</div>
       ) : (
         <div className="topology-viewport">
+          <div className="topology-columns" style={{ width: width * zoom }}>
+            {['连接', '策略组', '节点', '规则', '设备', '端口']
+              .slice(0, Math.round(width / 220))
+              .map((label) => (
+                <span key={label} style={{ width: 220 * zoom }}>
+                  {label}
+                </span>
+              ))}
+          </div>
           <svg
             width={width * zoom}
             height={height * zoom}
@@ -122,8 +131,8 @@ export default function NetworkTopology({
                       setOverrides((old) => ({ ...old, [node.id]: !expanded }))
                   }}
                 >
-                  <span className="topology-node-kind">
-                    {labels[node.type]} {node.children.length ? (expanded ? '−' : '+') : ''}
+                  <span className="topology-node-kind" aria-hidden="true">
+                    {node.children.length ? (expanded ? '−' : '+') : ''}
                   </span>
                   <span className="truncate block font-medium">{node.name}</span>
                   <span className="text-xs text-foreground-500">

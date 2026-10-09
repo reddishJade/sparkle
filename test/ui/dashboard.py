@@ -72,7 +72,8 @@ with sync_playwright() as p:
     page.wait_for_timeout(500)
     page.screenshot(path='/tmp/sparkle-home-dark.png',full_page=True)
     page.set_viewport_size({'width':850,'height':700})
-    page.locator('.topology-viewport').scroll_into_view_if_needed()
+    page.locator('.content').evaluate('(element) => element.scrollTop = 0')
+    assert page.get_by_text('网络拓扑',exact=True).bounding_box()['y'] < 350
     page.screenshot(path='/tmp/sparkle-home-compact.png',full_page=True)
     assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
     page.evaluate("window.__emit('appConfigUpdated',{});localStorage.removeItem('proxy-expanded')")

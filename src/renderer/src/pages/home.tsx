@@ -33,8 +33,15 @@ export default function Home() {
   ]
   return (
     <BasePage title="主页">
-      <div className="dashboard-content">
-        <div className="dashboard-metrics">
+      <div className="dashboard-content home-content">
+        <div className="home-status">
+          <span className={`home-status-label ${live.connected ? 'is-connected' : ''}`}>
+            <i />
+            {live.connected ? '已连接到 Mihomo' : '等待内核连接…'}
+          </span>
+          <span>{controledMihomoConfig?.['external-controller']}</span>
+        </div>
+        <div className="dashboard-metrics metric-strip">
           {metrics.map(([label, value]) => (
             <div className="dashboard-panel" key={label}>
               <div className="text-xs text-foreground-500 mb-2">{label}</div>
@@ -42,11 +49,8 @@ export default function Home() {
             </div>
           ))}
         </div>
-        <div className="text-xs text-foreground-500 flex justify-between">
-          <span>{live.connected ? '已连接到 Mihomo' : '等待内核连接…'}</span>
-          <span>{controledMihomoConfig?.['external-controller']}</span>
-        </div>
-        <div className="dashboard-grid charts">
+        <NetworkTopology connections={connections} />
+        <div className="home-charts">
           <section className="dashboard-panel">
             <h2>实时流量</h2>
             <HistoryChart
@@ -74,6 +78,8 @@ export default function Home() {
               format={(v) => String(Math.round(v))}
             />
           </section>
+        </div>
+        <div className="home-details">
           <section className="dashboard-panel">
             <h2>流量分布</h2>
             <Distribution
@@ -113,7 +119,6 @@ export default function Home() {
           </section>
         </div>
         <NetworkInfo />
-        <NetworkTopology connections={connections} />
       </div>
     </BasePage>
   )

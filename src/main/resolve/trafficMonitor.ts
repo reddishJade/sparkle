@@ -1,11 +1,13 @@
-import { ChildProcess, spawn } from 'child_process'
+import { ChildProcess } from 'child_process'
 import { getAppConfig } from '../config'
 import { dataDir, resourcesFilesDir } from '../utils/dirs'
 import path from 'path'
 import { existsSync } from 'fs'
 import { readFile, rm, writeFile } from 'fs/promises'
+import { spawnObserved } from '../utils/spawn-observed'
+import { appendAppLog } from '../utils/log'
 
-let child: ChildProcess
+let child: ChildProcess | undefined
 
 export async function startMonitor(detached = false): Promise<void> {
   if (process.platform !== 'win32') return
@@ -22,10 +24,21 @@ export async function startMonitor(detached = false): Promise<void> {
   await stopMonitor()
   const { showTraffic = false } = await getAppConfig()
   if (!showTraffic) return
-  child = spawn(path.join(resourcesFilesDir(), 'TrafficMonitor/TrafficMonitor.exe'), [], {
-    cwd: path.join(resourcesFilesDir(), 'TrafficMonitor'),
-    detached: detached,
-    stdio: detached ? 'ignore' : undefined
+  const monitor = await spawnObserved(
+    path.join(resourcesFilesDir(), 'TrafficMonitor/TrafficMonitor.exe'),
+    [],
+    {
+      cwd: path.join(resourcesFilesDir(), 'TrafficMonitor'),
+      detached: detached,
+      stdio: detached ? 'ignore' : undefined
+    },
+    (error) => {
+      appendAppLog(`[TrafficMonitor]: process error: ${error}\n`).catch(() => {})
+    }
+  )
+  child = monitor
+  monitor.once('exit', () => {
+    if (child === monitor) child = undefined
   })
   if (detached) {
     if (child && child.pid) {
@@ -38,5 +51,6 @@ export async function startMonitor(detached = false): Promise<void> {
 async function stopMonitor(): Promise<void> {
   if (child) {
     child.kill('SIGINT')
+    child = undefined
   }
 }

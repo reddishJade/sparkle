@@ -214,7 +214,7 @@ export default function Proxies() {
       excluded
     )
     return (
-      <section className="dashboard-panel mb-3" key={group.name}>
+      <section className="dashboard-panel proxy-group mb-3" key={group.name}>
         <div className="flex items-center justify-between gap-2">
           <button
             className="text-left min-w-0 flex-1"
@@ -369,7 +369,7 @@ export default function Proxies() {
                       showGroupSelectedProxy={appConfig?.showGroupSelectedProxy ?? true}
                       showProxyDetailTooltip={appConfig?.showProxyDetailTooltip ?? true}
                     />
-                    <div className="flex justify-between text-[10px] text-foreground-500 mt-1 px-1">
+                    <div className="proxy-node-meta">
                       <span>
                         {proxy.name === recommended ? '推荐 · ' : ''}
                         {performance[proxy.name]
@@ -377,6 +377,7 @@ export default function Proxies() {
                           : ''}
                       </span>
                       <button
+                        className="proxy-exclude"
                         onClick={() =>
                           setExcluded((old) =>
                             old.includes(proxy.name)
@@ -411,7 +412,7 @@ export default function Proxies() {
   return (
     <BasePage
       title="代理"
-      contentClassName="flex flex-col overflow-hidden"
+      contentClassName="proxy-content flex flex-col overflow-hidden"
       header={
         <div className="flex gap-1 app-nodrag">
           <Button
@@ -445,7 +446,7 @@ export default function Proxies() {
         </div>
       ) : (
         <>
-          <div className="p-3 flex flex-wrap items-center gap-2 border-b border-border">
+          <div className="proxy-toolbar">
             <InputGroup className="min-w-40 flex-1">
               <InputGroup.Input
                 aria-label="搜索代理"
@@ -525,7 +526,7 @@ export default function Proxies() {
                 checked={autoSwitch}
                 onChange={(e) => setAutoSwitch(e.target.checked)}
               />
-              测速后选推荐节点
+              自动选优
             </label>
           </div>
           {controledMihomoConfig?.mode === 'direct' ? (

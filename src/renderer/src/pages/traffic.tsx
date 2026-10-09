@@ -169,7 +169,7 @@ export default function UsagePage() {
         </div>
       }
     >
-      <div className="dashboard-content">
+      <div className="dashboard-content usage-content">
         <div className="flex flex-wrap gap-2 items-center">
           {views.map(([id, name]) => (
             <Button
@@ -250,7 +250,7 @@ export default function UsagePage() {
             </Button>
           </p>
         )}
-        <div className="dashboard-metrics">
+        <div className="dashboard-metrics metric-strip usage-metrics">
           {[
             ['总用量', calcTraffic((data?.totalUpload ?? 0) + (data?.totalDownload ?? 0))],
             ['上传', calcTraffic(data?.totalUpload ?? 0)],
@@ -275,12 +275,15 @@ export default function UsagePage() {
             labels={['下载', '上传']}
             format={calcTraffic}
           />
-          <p className="text-xs text-foreground-500">
+          <p className="usage-period text-xs text-foreground-500">
             {valid
               ? `${new Date(query.start).toLocaleString()} — ${new Date(query.end).toLocaleString()}`
               : '—'}{' '}
-            · 按分钟记录连接流量；历史数据从{' '}
-            {data?.startedAt ? new Date(data.startedAt).toLocaleString() : '首次运行'} 开始采集。
+            <span
+              title={`历史数据从 ${data?.startedAt ? new Date(data.startedAt).toLocaleString() : '首次运行'} 开始采集`}
+            >
+              按分钟记录
+            </span>
           </p>
         </section>
         <div className="usage-layout">
