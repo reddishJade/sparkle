@@ -18,7 +18,6 @@ import MihomoCoreCard from './mihomo-core-card'
 import OverrideCard from './override-card'
 import ProfileCard from './profile-card'
 import ProxyCard from './proxy-card'
-import ResourceCard from './resource-card'
 import RuleCard from './rule-card'
 import SniffCard from './sniff-card'
 import TrafficCard from './traffic-card'
@@ -52,7 +51,6 @@ const defaultSiderOrder = [
   'profile',
   'mihomo',
   'rule',
-  'resource',
   'override',
   'log'
 ]
@@ -69,7 +67,6 @@ const siderCardRouteMap = {
   'sniff-card': '/sniffer',
   'log-card': '/logs',
   'rule-card': '/rules',
-  'resource-card': '/resources',
   'override-card': '/override'
 } as const
 
@@ -89,7 +86,6 @@ const componentMap = {
   sniff: SniffCard,
   log: LogCard,
   rule: RuleCard,
-  resource: ResourceCard,
   override: OverrideCard
 }
 

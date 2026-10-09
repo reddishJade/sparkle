@@ -4,7 +4,7 @@ import { useTheme } from 'next-themes'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { NavigateFunction, useLocation, useNavigate, useRoutes } from 'react-router-dom'
 import OutboundModeSwitcher from '@renderer/components/sider/outbound-mode-switcher'
-import { IoSettings } from 'react-icons/io5'
+import { IoSettings, IoHomeOutline } from 'react-icons/io5'
 import routes, { useDeferredRoutePreload } from '@renderer/routes'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { applyTheme, checkUpdate, setNativeTheme, setTitleBarOverlay } from '@renderer/utils/ipc'
@@ -312,6 +312,16 @@ const App: React.FC = () => {
             <Button
               size="sm"
               isIconOnly
+              aria-label="主页"
+              onPress={() => navigate('/home')}
+              variant={location.pathname === '/home' ? 'primary' : 'ghost'}
+              className="app-nodrag"
+            >
+              <IoHomeOutline className="text-[20px]" />
+            </Button>
+            <Button
+              size="sm"
+              isIconOnly
               onPress={() => navigate('/settings')}
               variant={location.pathname.includes('/settings') ? 'primary' : 'ghost'}
               data-color={location.pathname.includes('/settings') ? 'primary' : 'default'}
@@ -335,26 +345,38 @@ const App: React.FC = () => {
               <div className="flex ml-1">
                 <h3 className="text-lg font-bold leading-8">Sparkle</h3>
               </div>
-              {latest && latest.version && (
-                <Suspense fallback={null}>
-                  <UpdaterButton
-                    latest={latest}
-                    showButtonAfterNotification={showUpdateButtonAfterNotification}
-                  />
-                </Suspense>
-              )}
-              <Button
-                size="sm"
-                isIconOnly
-                onPress={() => {
-                  navigate('/settings')
-                }}
-                variant={location.pathname.includes('/settings') ? 'primary' : 'ghost'}
-                data-color={location.pathname.includes('/settings') ? 'primary' : 'default'}
-                className="app-nodrag"
-              >
-                <IoSettings className="text-[20px]" />
-              </Button>
+              <div className="flex items-center gap-1 ml-auto">
+                {latest && latest.version && (
+                  <Suspense fallback={null}>
+                    <UpdaterButton
+                      latest={latest}
+                      showButtonAfterNotification={showUpdateButtonAfterNotification}
+                    />
+                  </Suspense>
+                )}
+                <Button
+                  size="sm"
+                  isIconOnly
+                  aria-label="主页"
+                  onPress={() => navigate('/home')}
+                  variant={location.pathname === '/home' ? 'primary' : 'ghost'}
+                  className="app-nodrag"
+                >
+                  <IoHomeOutline className="text-[20px]" />
+                </Button>
+                <Button
+                  size="sm"
+                  isIconOnly
+                  onPress={() => {
+                    navigate('/settings')
+                  }}
+                  variant={location.pathname.includes('/settings') ? 'primary' : 'ghost'}
+                  data-color={location.pathname.includes('/settings') ? 'primary' : 'default'}
+                  className="app-nodrag"
+                >
+                  <IoSettings className="text-[20px]" />
+                </Button>
+              </div>
             </div>
           </div>
           <div className="mt-2 mx-2">

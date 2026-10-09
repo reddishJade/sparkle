@@ -1,0 +1,108 @@
+// Network probes adapted from metacubexd; see licenses/metacubexd-MIT.txt.
+import { getNetworkInfo, getNetworkLatencies } from '@renderer/utils/ipc'
+import { Button } from '@heroui/react'
+import { useEffect, useState } from 'react'
+const providers = {
+  'ip.sb': 'https://api.ip.sb/geoip',
+  'ipwho.is': 'https://ipwho.is/',
+  'ipapi.is': 'https://api.ipapi.is/'
+}
+const targets = [
+  { name: 'Google', url: 'https://www.google.com/generate_204' },
+  { name: 'Cloudflare', url: 'https://cp.cloudflare.com/generate_204' },
+  { name: 'GitHub', url: 'https://github.com' }
+]
+export default function NetworkInfo() {
+  const [provider, setProvider] = useState<keyof typeof providers>('ip.sb')
+  const [ip, setIp] = useState<{ address: string; location: string; org: string }>()
+  const [ipError, setIpError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [latencies, setLatencies] = useState<Record<string, number | null>>({})
+  const [testing, setTesting] = useState(false)
+  async function fetchIP(selected = provider): Promise<void> {
+    setLoading(true)
+    setIpError('')
+    setIp(undefined)
+    try {
+      setIp(await getNetworkInfo(selected))
+    } catch (error) {
+      setIpError(`查询失败：${String(error)}`)
+    } finally {
+      setLoading(false)
+    }
+  }
+  async function test(): Promise<void> {
+    setTesting(true)
+    try {
+      setLatencies(await getNetworkLatencies())
+    } catch {
+      setLatencies(Object.fromEntries(targets.map((t) => [t.name, null])))
+    }
+    setTesting(false)
+  }
+  useEffect(() => {
+    void fetchIP()
+    void test()
+  }, [])
+  return (
+    <div className="dashboard-grid">
+      <section className="dashboard-panel">
+        <div className="flex items-center justify-between gap-2">
+          <h2>出口 IP</h2>
+          <div className="flex gap-2">
+            <select
+              className="dashboard-select"
+              aria-label="IP 查询服务"
+              value={provider}
+              onChange={(event) => {
+                const next = event.target.value as keyof typeof providers
+                setProvider(next)
+                void fetchIP(next)
+              }}
+            >
+              {Object.keys(providers).map((name) => (
+                <option key={name}>{name}</option>
+              ))}
+            </select>
+            <Button size="sm" variant="ghost" isDisabled={loading} onPress={() => void fetchIP()}>
+              刷新
+            </Button>
+          </div>
+        </div>
+        <div className="text-xl font-semibold select-text my-3">
+          {loading ? '正在查询…' : (ip?.address ?? '—')}
+        </div>
+        <p className="text-sm text-foreground-500">
+          {ip?.location} {ip?.org}
+        </p>
+        {ipError && (
+          <p role="alert" className="text-sm text-danger">
+            {ipError}
+          </p>
+        )}
+      </section>
+      <section className="dashboard-panel">
+        <div className="flex justify-between items-center">
+          <h2>网络延迟</h2>
+          <Button size="sm" variant="ghost" isDisabled={testing} onPress={() => void test()}>
+            {testing ? '测试中…' : '测试全部'}
+          </Button>
+        </div>
+        {targets.map((target) => (
+          <div key={target.name} className="flex justify-between mt-3 text-sm">
+            <span>{target.name}</span>
+            <span className="text-foreground-500">
+              {testing
+                ? '测试中…'
+                : latencies[target.name] === undefined
+                  ? '—'
+                  : latencies[target.name] === null
+                    ? '连接失败 / 超时'
+                    : `${latencies[target.name]} ms`}
+            </span>
+          </div>
+        ))}
+      </section>
+    </div>
+  )
+}

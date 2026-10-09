@@ -15,6 +15,9 @@ import { IoMdRefresh } from 'react-icons/io'
 import { CgLoadbarDoc } from 'react-icons/cg'
 import { MdEditDocument } from 'react-icons/md'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+
+dayjs.extend(relativeTime)
 import { notify } from '@renderer/utils/notification'
 
 const RuleProvider: React.FC = () => {
@@ -55,7 +58,7 @@ const RuleProvider: React.FC = () => {
     }
   }, [showDetails.title])
 
-  const { data, mutate } = useSWR('mihomoRuleProviders', mihomoRuleProviders, {
+  const { data, mutate, error, isLoading } = useSWR('mihomoRuleProviders', mihomoRuleProviders, {
     errorRetryInterval: 200,
     errorRetryCount: 10
   })
@@ -108,7 +111,28 @@ const RuleProvider: React.FC = () => {
   }
 
   if (!providers.length) {
-    return null
+    return (
+      <div className="dashboard-empty">
+        {isLoading ? (
+          '正在读取规则集合…'
+        ) : error ? (
+          <>
+            <p role="alert">读取规则集合失败：{String(error)}</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                void mutate()
+              }}
+            >
+              重试
+            </Button>
+          </>
+        ) : (
+          '当前配置未包含规则集合'
+        )}
+      </div>
+    )
   }
 
   return (

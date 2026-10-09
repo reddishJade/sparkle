@@ -74,7 +74,7 @@ const TrafficCard: React.FC<Props> = (props) => {
           >
             <IoStatsChart className="text-[20px]" />
           </Button>
-          <Tooltip.Content placement="right">{'流量统计'}</Tooltip.Content>
+          <Tooltip.Content placement="right">{'用量'}</Tooltip.Content>
         </Tooltip>
       </div>
     )
@@ -134,7 +134,7 @@ const TrafficCard: React.FC<Props> = (props) => {
           <h3
             className={`text-md font-bold ${match ? 'text-primary-foreground' : 'text-foreground'}`}
           >
-            流量统计
+            用量
           </h3>
         </Card.Footer>
       </Card>

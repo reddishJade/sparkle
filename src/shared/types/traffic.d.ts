@@ -58,6 +58,7 @@ export interface TrafficCheckpoint {
 }
 
 export interface TrafficStatsStorage {
+  usage?: UsageStorage
   version: 1
   checkpoint: TrafficCheckpoint
   days: Record<string, DayTrafficStats>
@@ -91,3 +92,45 @@ export interface TrafficStatsSummary {
   updatedAt: number
 }
 
+export type UsageDimension = 'sourceIP' | 'inboundUser' | 'host' | 'outbound' | 'process'
+export interface UsageRecord {
+  time: number
+  id: string
+  sourceIP: string
+  inboundUser: string
+  host: string
+  outbound: string
+  process: string
+  upload: number
+  download: number
+}
+export interface UsageStorage {
+  records: UsageRecord[]
+  retention: number
+  instanceId?: string
+  baseline: Record<string, { upload: number; download: number; lastSeen?: number }>
+  startedAt: number
+  initialized?: boolean
+}
+export interface UsageQuery {
+  start: number
+  end: number
+  dimension: UsageDimension
+  filters?: Partial<Record<UsageDimension, string>>
+}
+export interface UsageEntry {
+  label: string
+  upload: number
+  download: number
+  total: number
+  count: number
+}
+export interface UsageResult {
+  entries: UsageEntry[]
+  trend: Array<{ time: number; upload: number; download: number }>
+  totalUpload: number
+  totalDownload: number
+  count: number
+  retention: number
+  startedAt: number
+}

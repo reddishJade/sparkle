@@ -7,6 +7,7 @@ import {
 } from '@renderer/utils/ipc'
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import Viewer from './viewer'
+import ProviderNodes from './provider-nodes'
 import useSWR from 'swr'
 import SettingCard from '../base/base-setting-card'
 import SettingItem from '../base/base-setting-item'
@@ -15,6 +16,9 @@ import { CgLoadbarDoc } from 'react-icons/cg'
 import { MdEditDocument, MdQrCode2 } from 'react-icons/md'
 import QRCodeModal from '../base/base-qrcode-modal'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+
+dayjs.extend(relativeTime)
 import { calcTraffic } from '@renderer/utils/calc'
 import { getHash } from '@renderer/utils/hash'
 
@@ -55,7 +59,7 @@ const ProxyProvider: React.FC = () => {
     }
   }, [showDetails.title])
 
-  const { data, mutate } = useSWR('mihomoProxyProviders', mihomoProxyProviders, {
+  const { data, mutate, error, isLoading } = useSWR('mihomoProxyProviders', mihomoProxyProviders, {
     errorRetryInterval: 200,
     errorRetryCount: 10
   })
@@ -99,7 +103,28 @@ const ProxyProvider: React.FC = () => {
   }
 
   if (!providers.length) {
-    return null
+    return (
+      <div className="dashboard-empty">
+        {isLoading ? (
+          '正在读取代理集合…'
+        ) : error ? (
+          <>
+            <p role="alert">读取代理集合失败：{String(error)}</p>
+            <Button
+              size="sm"
+              variant="ghost"
+              onPress={() => {
+                void mutate()
+              }}
+            >
+              重试
+            </Button>
+          </>
+        ) : (
+          '当前配置未包含代理集合'
+        )}
+      </div>
+    )
   }
 
   const onShowQrCode = async (name: string): Promise<void> => {
@@ -249,6 +274,12 @@ const ProxyProvider: React.FC = () => {
               {index !== providers.length - 1 && <Separator className="my-2" />}
             </>
           )}
+          <ProviderNodes
+            provider={provider}
+            refresh={() => {
+              void mutate()
+            }}
+          />
         </Fragment>
       ))}
     </SettingCard>

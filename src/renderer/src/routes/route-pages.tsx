@@ -13,7 +13,7 @@ const TrafficPage = createPreloadablePage(() => import('@renderer/pages/traffic'
 const MihomoPage = createPreloadablePage(() => import('@renderer/pages/mihomo'))
 const SysproxyPage = createPreloadablePage(() => import('@renderer/pages/syspeoxy'))
 const TunPage = createPreloadablePage(() => import('@renderer/pages/tun'))
-const ResourcesPage = createPreloadablePage(() => import('@renderer/pages/resources'))
+const HomePage = createPreloadablePage(() => import('@renderer/pages/home'))
 const DNSPage = createPreloadablePage(() => import('@renderer/pages/dns'))
 const SnifferPage = createPreloadablePage(() => import('@renderer/pages/sniffer'))
 
@@ -28,11 +28,11 @@ export const Traffic = TrafficPage.Page
 export const Mihomo = MihomoPage.Page
 export const Sysproxy = SysproxyPage.Page
 export const Tun = TunPage.Page
-export const Resources = ResourcesPage.Page
+export const Home = HomePage.Page
 export const DNS = DNSPage.Page
 export const Sniffer = SnifferPage.Page
 
-void ProxiesPage.preload().catch(() => {})
+void HomePage.preload().catch(() => {})
 
 const remainingPageLoaders: Array<() => Promise<unknown>> = [
   SettingsPage.preload,
@@ -45,7 +45,7 @@ const remainingPageLoaders: Array<() => Promise<unknown>> = [
   TunPage.preload,
   DNSPage.preload,
   SnifferPage.preload,
-  ResourcesPage.preload,
+  ProxiesPage.preload,
   OverridePage.preload,
   LogsPage.preload
 ]

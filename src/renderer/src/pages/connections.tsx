@@ -1,5 +1,7 @@
 import { Button, Badge, Tooltip, Separator, Select, Tabs, ListBox, InputGroup } from '@heroui/react'
 
+import { getConnectionArchive } from '@renderer/hooks/use-live-data'
+import ConnectionTable from '@renderer/components/connections/connection-table'
 import BasePage from '@renderer/components/base/base-page'
 import QuickRuleProvider from '@renderer/components/rules/quick-rule-provider'
 import { mihomoCloseConnections, mihomoCloseConnection } from '@renderer/utils/ipc'
@@ -37,9 +39,16 @@ import {
 let cachedConnections: ControllerConnectionDetail[] = []
 
 const Connections: React.FC = () => {
+  const initialConnections = useMemo(
+    () => (cachedConnections.length ? cachedConnections : getConnectionArchive()),
+    []
+  )
   const navigate = useNavigate()
   const { controledMihomoConfig } = useControledMihomoConfig()
   const { 'find-process-mode': findProcessMode = 'always' } = controledMihomoConfig || {}
+  const [displayMode, setDisplayMode] = useState(
+    () => localStorage.getItem('sparkle-connections-view') || 'table'
+  )
   const [filter, setFilter] = useState('')
   const { appConfig, patchAppConfig } = useAppConfig()
   const {
@@ -56,12 +65,12 @@ const Connections: React.FC = () => {
   } = appConfig || {}
   const [connectionsInfo, setConnectionsInfo] = useState<ControllerConnections>()
   const [allConnections, setAllConnections] =
-    useState<ControllerConnectionDetail[]>(cachedConnections)
+    useState<ControllerConnectionDetail[]>(initialConnections)
   const [activeConnections, setActiveConnections] = useState<ControllerConnectionDetail[]>(() =>
-    cachedConnections.filter((connection) => connection.isActive)
+    initialConnections.filter((connection) => connection.isActive)
   )
   const [closedConnections, setClosedConnections] = useState<ControllerConnectionDetail[]>(() =>
-    cachedConnections.filter((connection) => !connection.isActive)
+    initialConnections.filter((connection) => !connection.isActive)
   )
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false)
   const [isSettingDrawerOpen, setIsSettingDrawerOpen] = useState(false)
@@ -492,10 +501,10 @@ const Connections: React.FC = () => {
       processConnectionsRef.current(info)
     }
 
-    window.electron.ipcRenderer.on('mihomoConnections', handleConnections)
+    const unsubscribe = window.electron.ipcRenderer.on('mihomoConnections', handleConnections)
 
     return (): void => {
-      window.electron.ipcRenderer.removeAllListeners('mihomoConnections')
+      unsubscribe()
     }
   }, [])
 
@@ -975,6 +984,18 @@ const Connections: React.FC = () => {
       title="连接"
       header={
         <>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="app-nodrag"
+            onPress={() => {
+              const mode = displayMode === 'table' ? 'card' : 'table'
+              setDisplayMode(mode)
+              localStorage.setItem('sparkle-connections-view', mode)
+            }}
+          >
+            {displayMode === 'table' ? '卡片' : '表格'}
+          </Button>
           <div className="flex">
             <div className="flex items-center">
               <span className="mx-1 text-gray-400">
@@ -1029,11 +1050,7 @@ const Connections: React.FC = () => {
               data-color={isEffectivePaused ? 'warning' : 'default'}
               className="app-nodrag ml-2"
             >
-              {isEffectivePaused ? (
-                <IoPlay className="text-lg" />
-              ) : (
-                <IoPause className="text-lg" />
-              )}
+              {isEffectivePaused ? <IoPlay className="text-lg" /> : <IoPause className="text-lg" />}
             </Button>
             <Tooltip.Content placement="bottom">
               {isEffectivePaused
@@ -1295,7 +1312,16 @@ const Connections: React.FC = () => {
             </span>
           </div>
         )}
-        {grouped ? (
+        {displayMode === 'table' ? (
+          <ConnectionTable
+            connections={filteredConnections}
+            onSelect={(connection) => {
+              setSelected(connection)
+              setIsDetailModalOpen(true)
+            }}
+            onClose={closeConnection}
+          />
+        ) : grouped ? (
           connectionGroups.length > 0 ? (
             <GroupedVirtuoso
               key="connections-grouped"

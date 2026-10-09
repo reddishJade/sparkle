@@ -1,4 +1,6 @@
 import fs from 'fs'
+import { UsageJournal } from './usage-journal'
+import type { UsageQuery, UsageResult } from '../../shared/types/traffic'
 import { trafficStatsPath } from '../utils/dirs'
 import { TrafficStatsEngine } from './traffic-stats-engine'
 import type {
@@ -11,18 +13,23 @@ import { appendAppLog } from '../utils/log'
 const FLUSH_INTERVAL_MS = 10000
 
 class TrafficStatsService {
+  private usage: UsageJournal
   private engine: TrafficStatsEngine
   private flushTimer: NodeJS.Timeout | null = null
   private filePath: string
   private tmpFilePath: string
   private backupFilePath: string
   private isSaving = false
+  private usageRevision = 0
+  private savedUsageRevision = 0
 
   constructor() {
     this.filePath = trafficStatsPath()
     this.tmpFilePath = `${this.filePath}.tmp`
     this.backupFilePath = `${this.filePath}.backup`
-    this.engine = new TrafficStatsEngine(this.loadData())
+    const saved = this.loadData()
+    this.engine = new TrafficStatsEngine(saved)
+    this.usage = new UsageJournal(saved?.usage)
     this.startFlushTimer()
   }
 
@@ -34,7 +41,9 @@ class TrafficStatsService {
         return JSON.parse(raw) as TrafficStatsStorage
       }
     } catch (error) {
-      appendAppLog(`[TrafficStats]: Failed to load traffic stats from primary file: ${error}\n`).catch(() => {})
+      appendAppLog(
+        `[TrafficStats]: Failed to load traffic stats from primary file: ${error}\n`
+      ).catch(() => {})
     }
 
     // 2. 主文件损坏或读取失败时，尝试从备份文件 (.backup) 恢复
@@ -42,11 +51,15 @@ class TrafficStatsService {
       if (fs.existsSync(this.backupFilePath)) {
         const raw = fs.readFileSync(this.backupFilePath, 'utf-8')
         const data = JSON.parse(raw) as TrafficStatsStorage
-        appendAppLog(`[TrafficStats]: Successfully restored traffic stats from backup file\n`).catch(() => {})
+        appendAppLog(
+          `[TrafficStats]: Successfully restored traffic stats from backup file\n`
+        ).catch(() => {})
         return data
       }
     } catch (backupError) {
-      appendAppLog(`[TrafficStats]: Failed to load traffic stats from backup file: ${backupError}\n`).catch(() => {})
+      appendAppLog(
+        `[TrafficStats]: Failed to load traffic stats from backup file: ${backupError}\n`
+      ).catch(() => {})
     }
 
     return undefined
@@ -55,7 +68,10 @@ class TrafficStatsService {
   private startFlushTimer(): void {
     if (this.flushTimer) return
     this.flushTimer = setInterval(() => {
-      if (this.engine.isDirty() && !this.isSaving) {
+      if (
+        (this.engine.isDirty() || this.usageRevision !== this.savedUsageRevision) &&
+        !this.isSaving
+      ) {
         void this.flush()
       }
     }, FLUSH_INTERVAL_MS)
@@ -69,10 +85,23 @@ class TrafficStatsService {
 
   public feedSnapshot(snapshot: ControllerConnections): void {
     try {
-      this.engine.feedSnapshot(snapshot, Date.now(), this.currentCoreInstanceId)
+      const now = Date.now()
+      this.usage.feed(snapshot, now, this.currentCoreInstanceId)
+      this.usageRevision++
+      this.engine.feedSnapshot(snapshot, now, this.currentCoreInstanceId)
     } catch (error) {
       appendAppLog(`[TrafficStats]: Error processing snapshot: ${error}\n`).catch(() => {})
     }
+  }
+
+  public getUsage(query: UsageQuery): UsageResult {
+    return this.usage.query(query)
+  }
+
+  public async setUsageRetention(value: number): Promise<void> {
+    this.usage.setRetention(value)
+    this.usageRevision++
+    await this.flush()
   }
 
   public getSummary(range: TrafficTimeRange = 'today'): TrafficStatsSummary {
@@ -81,14 +110,17 @@ class TrafficStatsService {
 
   public async clear(): Promise<void> {
     this.engine.clear()
+    this.usage.clear()
+    this.usageRevision++
     await this.flush()
   }
 
   public async flush(): Promise<void> {
     if (this.isSaving) return
     this.isSaving = true
+    const revision = this.usageRevision
     try {
-      const data = this.engine.getRawData()
+      const data = { ...this.engine.getRawData(), usage: this.usage.serialize() }
       const content = JSON.stringify(data, null, 2)
       await fs.promises.writeFile(this.tmpFilePath, content, 'utf-8')
 
@@ -115,6 +147,7 @@ class TrafficStatsService {
         }
       }
       this.engine.markClean()
+      this.savedUsageRevision = revision
     } catch (error) {
       await appendAppLog(`[TrafficStats]: Failed to save traffic stats: ${error}\n`).catch(() => {})
     } finally {
@@ -124,8 +157,8 @@ class TrafficStatsService {
 
   public flushSync(): void {
     try {
-      if (!this.engine.isDirty()) return
-      const data = this.engine.getRawData()
+      if (!this.engine.isDirty() && this.usageRevision === this.savedUsageRevision) return
+      const data = { ...this.engine.getRawData(), usage: this.usage.serialize() }
       const content = JSON.stringify(data, null, 2)
       fs.writeFileSync(this.tmpFilePath, content, 'utf-8')
 
@@ -153,6 +186,7 @@ class TrafficStatsService {
         }
       }
       this.engine.markClean()
+      this.savedUsageRevision = this.usageRevision
     } catch {
       // ignore in sync exit
     }

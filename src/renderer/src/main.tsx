@@ -1,4 +1,5 @@
 import React from 'react'
+import { initializeLiveData } from './hooks/use-live-data'
 import ReactDOM from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
@@ -15,10 +16,12 @@ import { RulesProvider } from './hooks/use-rules'
 import { GroupsProvider } from './hooks/use-groups'
 import AppNotificationProvider from './components/base/app-notification-provider'
 
+initializeLiveData()
+
 let F12Count = 0
 
 if (!window.location.hash) {
-  window.history.replaceState(null, '', '#/proxies')
+  window.history.replaceState(null, '', '#/home')
 }
 
 init().then(() => {

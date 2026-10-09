@@ -111,10 +111,10 @@ const ConnCard: React.FC<Props> = (props) => {
       }
     }
 
-    window.electron.ipcRenderer.on('mihomoTraffic', handleTraffic)
+    const unsubscribe = window.electron.ipcRenderer.on('mihomoTraffic', handleTraffic)
 
     return (): void => {
-      window.electron.ipcRenderer.removeAllListeners('mihomoTraffic')
+      unsubscribe()
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current)
       }

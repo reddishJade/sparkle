@@ -614,3 +614,21 @@ async function alert<T>(msg: T): Promise<void> {
 }
 
 window.alert = alert
+
+export async function getUsage(
+  query: import('../../../shared/types/traffic').UsageQuery
+): Promise<import('../../../shared/types/traffic').UsageResult> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getUsage', query))
+}
+export async function setUsageRetention(value: number): Promise<void> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('setUsageRetention', value))
+}
+
+export async function getNetworkInfo(
+  provider: string
+): Promise<{ address: string; location: string; org: string }> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkInfo', provider))
+}
+export async function getNetworkLatencies(): Promise<Record<string, number | null>> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkLatencies'))
+}

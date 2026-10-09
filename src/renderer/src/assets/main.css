@@ -3,6 +3,7 @@
 @import './app-theme.css';
 @import './app-controls.css';
 @import './app-pages.css';
+@import './dashboard.css';
 @custom-variant dark (&:is(.dark *));
 
 @keyframes proxy-row-in {

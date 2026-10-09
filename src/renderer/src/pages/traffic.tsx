@@ -1,807 +1,479 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, InputGroup, ListBox, Select, Tooltip } from '@heroui/react'
-import { Virtuoso } from 'react-virtuoso'
+// Adapted from metacubexd's traffic page and useDataUsage; see licenses/metacubexd-MIT.txt.
+import { Button, InputGroup } from '@heroui/react'
+import { useEffect, useMemo, useState } from 'react'
+import useSWR from 'swr'
 import BasePage from '@renderer/components/base/base-page'
 import ConfirmModal from '@renderer/components/base/base-confirm'
-import { calcTrafficTotal as calcTraffic } from '@renderer/utils/calc'
-import { clearTrafficStats, getTrafficStats } from '@renderer/utils/ipc'
-import type {
-  TrafficConnectionItem,
-  TrafficDimension,
-  TrafficStatsSummary,
-  TrafficSummaryItem,
-  TrafficTimeRange
-} from '../../../shared/types/traffic'
-import { LuCpu, LuGroup, LuServer } from 'react-icons/lu'
-import { IoLayersOutline, IoLink, IoRefresh, IoStatsChart } from 'react-icons/io5'
-import { AiOutlineGlobal } from 'react-icons/ai'
-import { CgTrash } from 'react-icons/cg'
-import { HiSortAscending, HiSortDescending } from 'react-icons/hi'
+import HistoryChart from '@renderer/components/home/history-chart'
+import { calcTraffic } from '@renderer/utils/calc'
+import { clearTrafficStats, getUsage, setUsageRetention } from '@renderer/utils/ipc'
+import { notify } from '@renderer/utils/notification'
+import type { UsageDimension, UsageEntry, UsageQuery } from '../../../shared/types/traffic'
+import { downloadText, csvField } from '@renderer/utils/download'
 
-const STORAGE_KEY = 'sparkle_traffic_preferences'
-
-interface TrafficPreferences {
-  timeRange?: TrafficTimeRange
-  dimension?: TrafficDimension
-  sortBy?: 'total' | 'upload' | 'download'
-  sortDirection?: 'asc' | 'desc'
-  ruleCategory?: 'all' | 'ruleset' | 'direct'
-}
-
-function loadStoredPreferences(): TrafficPreferences {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as TrafficPreferences
-  } catch {
-    // ignore
-  }
-  return {}
-}
-
-function formatTime(timeStr?: string): string {
-  if (!timeStr) return ''
-  const d = new Date(timeStr)
-  if (isNaN(d.getTime())) return timeStr
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  const s = String(d.getSeconds()).padStart(2, '0')
-  return `${h}:${m}:${s}`
-}
-
-function parseRuleDisplay(name: string): { type: string; payload?: string } {
-  const match = name.match(/^([A-Za-z0-9_-]+)\((.*)\)$/)
-  if (match) {
-    return { type: match[1], payload: match[2] }
-  }
-  return { type: name }
-}
-
-function isRuleSet(name: string): boolean {
-  return name.startsWith('RuleSet(') || name.startsWith('RULE-SET(')
-}
-
-function renderRankBadge(index: number) {
-  if (index === 0) {
-    return (
-      <span className="w-5.5 h-5.5 rounded-md flex items-center justify-center font-mono text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shrink-0">
-        1
-      </span>
-    )
-  }
-  if (index === 1) {
-    return (
-      <span className="w-5.5 h-5.5 rounded-md flex items-center justify-center font-mono text-xs font-bold bg-slate-400/15 text-slate-600 dark:text-slate-300 border border-slate-400/30 shrink-0">
-        2
-      </span>
-    )
-  }
-  if (index === 2) {
-    return (
-      <span className="w-5.5 h-5.5 rounded-md flex items-center justify-center font-mono text-xs font-bold bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30 shrink-0">
-        3
-      </span>
-    )
-  }
-  return (
-    <span className="w-5.5 h-5.5 flex items-center justify-center font-mono text-xs text-foreground-400/70 shrink-0">
-      {index + 1}
-    </span>
-  )
-}
-
-type DisplayItem =
-  | { kind: 'summary'; data: TrafficSummaryItem }
-  | { kind: 'connection'; data: TrafficConnectionItem }
-
-interface DimensionConfig {
-  id: TrafficDimension
-  label: string
-  icon: React.ReactNode
-}
-
-const DIMENSIONS: DimensionConfig[] = [
-  { id: 'nodes', label: '节点', icon: <LuServer className="text-sm" /> },
-  { id: 'groups', label: '策略组', icon: <LuGroup className="text-sm" /> },
-  { id: 'rules', label: '分流规则', icon: <IoLayersOutline className="text-sm" /> },
-  { id: 'hosts', label: '目标域名', icon: <AiOutlineGlobal className="text-sm" /> },
-  { id: 'processes', label: '应用进程', icon: <LuCpu className="text-sm" /> },
-  { id: 'connections', label: '连接明细', icon: <IoLink className="text-sm" /> }
+const views: Array<[UsageDimension, string]> = [
+  ['sourceIP', '设备'],
+  ['inboundUser', '用户'],
+  ['host', '域名'],
+  ['outbound', '节点'],
+  ['process', '进程']
 ]
-
-const dimensionLabels: Record<TrafficDimension, string> = {
-  nodes: '节点',
-  groups: '策略组',
-  rules: '分流规则',
-  hosts: '域名',
-  processes: '进程',
-  connections: '连接'
+const ranges = [
+  [3600000, '最近一小时'],
+  [86400000, '最近一天'],
+  [604800000, '最近一周'],
+  [2592000000, '最近一月'],
+  [-1, '自定义']
+] as const
+const dateInput = (time: number) => {
+  const date = new Date(time)
+  return new Date(time - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16)
 }
-
-const TrafficPage: React.FC = () => {
-  const initialPrefs = useMemo(() => loadStoredPreferences(), [])
-  const [timeRange, setTimeRange] = useState<TrafficTimeRange>(initialPrefs.timeRange || 'session')
-  const [dimension, setDimension] = useState<TrafficDimension>(initialPrefs.dimension || 'nodes')
-  const [ruleCategory, setRuleCategory] = useState<'all' | 'ruleset' | 'direct'>(
-    initialPrefs.ruleCategory || 'all'
+function preference<T>(key: string, fallback: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? 'null') ?? fallback
+  } catch {
+    return fallback
+  }
+}
+export default function UsagePage() {
+  const [dimension, setDimension] = useState<UsageDimension>(() =>
+    preference('usage-view', 'sourceIP')
   )
+  const [range, setRange] = useState<number>(() => preference('usage-range', 3600000))
+  const [start, setStart] = useState(() =>
+    preference('usage-start', dateInput(Date.now() - 86400000))
+  )
+  const [end, setEnd] = useState(() => preference('usage-end', dateInput(Date.now())))
+  const [now, setNow] = useState(Date.now())
   const [filter, setFilter] = useState('')
-  const [sortBy, setSortBy] = useState<'total' | 'upload' | 'download'>(
-    initialPrefs.sortBy || 'total'
+  const [sort, setSort] = useState<'label' | 'upload' | 'download' | 'total' | 'count'>('total')
+  const [descending, setDescending] = useState(true)
+  const [selected, setSelected] = useState<string | null>(null)
+  const [subselected, setSubselected] = useState<string | null>(null)
+  const [clearOpen, setClearOpen] = useState(false)
+  const [pendingRetention, setPendingRetention] = useState<number | null>(null)
+  const query = useMemo<UsageQuery>(
+    () => ({
+      start: range === -1 ? new Date(start).getTime() : now - range,
+      end: range === -1 ? new Date(end).getTime() : now,
+      dimension
+    }),
+    [dimension, range, start, end, now]
   )
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(
-    initialPrefs.sortDirection || 'desc'
+  const valid =
+    Number.isFinite(query.start) && Number.isFinite(query.end) && query.start < query.end
+  const { data, error, mutate, isLoading } = useSWR(
+    valid ? ['usage', query] : null,
+    () => getUsage(query),
+    { keepPreviousData: true }
   )
-  const [stats, setStats] = useState<TrafficStatsSummary | null>(null)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
-
-  // 选项偏好持久化
-  useEffect(() => {
-    try {
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({ timeRange, dimension, sortBy, sortDirection, ruleCategory })
-      )
-    } catch {
-      // ignore
-    }
-  }, [timeRange, dimension, sortBy, sortDirection, ruleCategory])
-
-  const loadData = useCallback(async () => {
-    try {
-      const res = await getTrafficStats(timeRange)
-      setStats(res)
-    } catch {
-      // ignore
-    }
-  }, [timeRange])
-
-  useEffect(() => {
-    void loadData()
-    const timer = setInterval(() => {
-      void loadData()
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [loadData])
-
-  const handleManualRefresh = useCallback(async (): Promise<void> => {
-    setIsRefreshing(true)
-    try {
-      await loadData()
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 300)
-    }
-  }, [loadData])
-
-  const handleClear = useCallback(async (): Promise<void> => {
-    setShowClearConfirm(false)
-    try {
-      await clearTrafficStats()
-      await loadData()
-    } catch {
-      // ignore
-    }
-  }, [loadData])
-
-  const filteredAndSortedItems: DisplayItem[] = useMemo(() => {
-    if (!stats) return []
-    const dir = sortDirection === 'asc' ? 1 : -1
-    const q = filter.trim().toLowerCase()
-
-    if (dimension === 'connections') {
-      let list = stats.connections || []
-      if (q !== '') {
-        list = list.filter(
-          (item) =>
-            item.destination.toLowerCase().includes(q) ||
-            (item.process && item.process.toLowerCase().includes(q)) ||
-            item.node.toLowerCase().includes(q) ||
-            (item.rule && item.rule.toLowerCase().includes(q)) ||
-            (item.rulePayload && item.rulePayload.toLowerCase().includes(q))
-        )
-      }
-      const sorted = [...list].sort((a, b) => {
-        if (sortBy === 'upload') return (a.upload - b.upload) * dir
-        if (sortBy === 'download') return (a.download - b.download) * dir
-        return (a.total - b.total) * dir
+  const subDimension: UsageDimension = dimension === 'host' ? 'sourceIP' : 'host'
+  const filters = useMemo(
+    () => (selected === null ? undefined : { [dimension]: selected }),
+    [dimension, selected]
+  )
+  const { data: sub, mutate: mutateSub } = useSWR(
+    valid && filters ? ['usage-sub', query, filters] : null,
+    () => getUsage({ ...query, dimension: subDimension, filters })
+  )
+  const detailDimension: UsageDimension = dimension === 'outbound' ? 'sourceIP' : 'outbound'
+  const { data: detail, mutate: mutateDetail } = useSWR(
+    valid && selected !== null && subselected !== null
+      ? ['usage-detail', query, filters, subselected]
+      : null,
+    () =>
+      getUsage({
+        ...query,
+        dimension: detailDimension,
+        filters: { ...filters, [subDimension]: subselected! }
       })
-      return sorted.map((item) => ({ kind: 'connection', data: item }))
-    }
-
-    let summaryList: TrafficSummaryItem[] = []
-    if (dimension === 'nodes') summaryList = stats.nodes || []
-    else if (dimension === 'groups') summaryList = stats.groups || []
-    else if (dimension === 'rules') {
-      summaryList = stats.rules || []
-      if (ruleCategory === 'ruleset') {
-        summaryList = summaryList.filter((item) => isRuleSet(item.name))
-      } else if (ruleCategory === 'direct') {
-        summaryList = summaryList.filter((item) => !isRuleSet(item.name))
+  )
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (range !== -1) setNow(Date.now())
+      else {
+        void mutate()
+        void mutateSub()
+        void mutateDetail()
       }
-    } else if (dimension === 'processes') summaryList = stats.processes || []
-    else if (dimension === 'hosts') summaryList = stats.hosts || []
-
-    if (q !== '') {
-      summaryList = summaryList.filter((item) => item.name.toLowerCase().includes(q))
+    }, 5000)
+    return () => clearInterval(timer)
+  }, [range, mutate, mutateSub, mutateDetail])
+  useEffect(() => {
+    for (const [key, value] of [
+      ['usage-view', dimension],
+      ['usage-range', range],
+      ['usage-start', start],
+      ['usage-end', end]
+    ])
+      localStorage.setItem(key as string, JSON.stringify(value))
+  }, [dimension, range, start, end])
+  useEffect(() => {
+    setSelected(null)
+    setSubselected(null)
+  }, [dimension, range, start, end])
+  const rows = useMemo(
+    () =>
+      (data?.entries ?? [])
+        .filter((entry) => entry.label.toLowerCase().includes(filter.toLowerCase()))
+        .sort(
+          (a, b) =>
+            (sort === 'label' ? a.label.localeCompare(b.label) : a[sort] - b[sort]) *
+            (descending ? -1 : 1)
+        ),
+    [data, filter, sort, descending]
+  )
+  const label = views.find(([id]) => id === dimension)?.[1] ?? '设备'
+  async function refresh(): Promise<void> {
+    setNow(Date.now())
+    await Promise.all([mutate(), mutateSub(), mutateDetail()])
+  }
+  async function changeRetention(value: number): Promise<void> {
+    try {
+      await setUsageRetention(value)
+      await refresh()
+    } catch (e) {
+      notify(e, { variant: 'danger' })
     }
-    const sorted = [...summaryList].sort((a, b) => {
-      if (sortBy === 'upload') return (a.upload - b.upload) * dir
-      if (sortBy === 'download') return (a.download - b.download) * dir
-      return (a.total - b.total) * dir
-    })
-    return sorted.map((item) => ({ kind: 'summary', data: item }))
-  }, [stats, dimension, ruleCategory, filter, sortBy, sortDirection])
-
-  const maxItemTotal = useMemo(() => {
-    if (filteredAndSortedItems.length === 0) return 1
-    let max = 0
-    for (const item of filteredAndSortedItems) {
-      if (item.data.total > max) max = item.data.total
-    }
-    return max > 0 ? max : 1
-  }, [filteredAndSortedItems])
-
-  const globalTotal = stats?.total ?? 0
-  const globalUpload = stats?.totalUpload ?? 0
-  const globalDownload = stats?.totalDownload ?? 0
-  const globalUnknown = stats?.unknownTotal ?? 0
-  const globalUpRatio = globalTotal > 0 ? (globalUpload / globalTotal) * 100 : 0
-  const globalDownRatio = globalTotal > 0 ? (globalDownload / globalTotal) * 100 : 0
-
+  }
   return (
     <BasePage
-      title="流量统计"
-      contentClassName="overflow-hidden flex flex-col h-[calc(100vh-49px)]"
+      title="用量"
       header={
-        <div className="flex items-center gap-1">
-          <Tooltip delay={0}>
-            <Button
-              size="sm"
-              isIconOnly
-              variant="ghost"
-              data-color="default"
-              aria-label="刷新"
-              className="app-nodrag"
-              onPress={handleManualRefresh}
-            >
-              <IoRefresh className={`text-lg ${isRefreshing ? 'animate-spin' : ''}`} />
-            </Button>
-            <Tooltip.Content placement="bottom">刷新数据</Tooltip.Content>
-          </Tooltip>
-          <Tooltip delay={0}>
-            <Button
-              size="sm"
-              isIconOnly
-              variant="ghost"
-              data-color="danger"
-              aria-label="清空统计"
-              className="app-nodrag text-danger hover:bg-danger/10"
-              onPress={() => setShowClearConfirm(true)}
-            >
-              <CgTrash className="text-lg" />
-            </Button>
-            <Tooltip.Content placement="bottom">清空统计数据</Tooltip.Content>
-          </Tooltip>
+        <div className="flex gap-1 app-nodrag">
+          <Button size="sm" variant="ghost" onPress={() => void refresh()}>
+            刷新
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onPress={() =>
+              downloadText(
+                'sparkle-usage.csv',
+                'text/csv',
+                [
+                  '名称,上传,下载,总量,连接数',
+                  ...rows.map((r) =>
+                    [csvField(r.label), r.upload, r.download, r.total, r.count].join(',')
+                  )
+                ].join('\n')
+              )
+            }
+          >
+            导出
+          </Button>
+          <Button size="sm" variant="ghost" onPress={() => setClearOpen(true)}>
+            清空
+          </Button>
         </div>
       }
     >
-      {showClearConfirm && (
-        <ConfirmModal
-          title="清空流量统计记录"
-          description={
-            <div>
-              <p className="text-sm text-foreground-600">
-                确定要清空所有持久化流量统计数据吗？此操作无法撤销。
-              </p>
-              <p className="text-xs text-foreground-400 mt-2">
-                清空后，所有节点、策略组、分流规则、连接、进程及域名的累计流量将被重置，统计将从当前时刻开始重新累计。
-              </p>
+      <div className="dashboard-content">
+        <div className="flex flex-wrap gap-2 items-center">
+          {views.map(([id, name]) => (
+            <Button
+              key={id}
+              size="sm"
+              variant={dimension === id ? 'primary' : 'ghost'}
+              onPress={() => setDimension(id)}
+            >
+              {name}
+            </Button>
+          ))}
+          <div className="flex-1" />
+          <select
+            className="dashboard-select"
+            aria-label="时间范围"
+            value={range}
+            onChange={(e) => setRange(Number(e.target.value))}
+          >
+            {ranges.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="dashboard-select"
+            aria-label="数据保留时长"
+            value={data?.retention ?? 2592000000}
+            onChange={(e) => {
+              const value = Number(e.target.value)
+              if (value > 0 && (data?.retention === -1 || value < (data?.retention ?? Infinity)))
+                setPendingRetention(value)
+              else void changeRetention(value)
+            }}
+          >
+            <option value={-1}>永久保留</option>
+            {ranges
+              .filter(([id]) => id !== -1)
+              .map(([id, name]) => (
+                <option key={id} value={id}>
+                  保留{name.replace('最近', '')}
+                </option>
+              ))}
+          </select>
+        </div>
+        {range === -1 && (
+          <div className="flex flex-wrap gap-2">
+            <label>
+              从{' '}
+              <input
+                className="dashboard-select"
+                type="datetime-local"
+                value={start}
+                onChange={(e) => setStart(e.target.value)}
+              />
+            </label>
+            <label>
+              至{' '}
+              <input
+                className="dashboard-select"
+                type="datetime-local"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+              />
+            </label>
+          </div>
+        )}
+        {!valid && (
+          <p role="alert" className="text-danger text-sm">
+            请选择有效的起止时间，结束时间须晚于开始时间。
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-danger text-sm">
+            读取用量失败：{String(error)}{' '}
+            <Button size="sm" onPress={() => void refresh()}>
+              重试
+            </Button>
+          </p>
+        )}
+        <div className="dashboard-metrics">
+          {[
+            ['总用量', calcTraffic((data?.totalUpload ?? 0) + (data?.totalDownload ?? 0))],
+            ['上传', calcTraffic(data?.totalUpload ?? 0)],
+            ['下载', calcTraffic(data?.totalDownload ?? 0)],
+            ['连接', data?.count ?? 0],
+            ['统计项目', data?.entries.length ?? 0]
+          ].map(([name, value]) => (
+            <div key={name} className="dashboard-panel">
+              <div className="text-xs text-foreground-500 mb-2">{name}</div>
+              <div className="text-lg font-semibold tabular-nums">{value}</div>
             </div>
-          }
-          confirmText="确认清空"
-          cancelText="取消"
+          ))}
+        </div>
+        <section className="dashboard-panel">
+          <h2>流量趋势</h2>
+          <HistoryChart
+            timestamps={data?.trend.map((point) => point.time)}
+            series={[
+              data?.trend.map((p) => p.download) ?? [],
+              data?.trend.map((p) => p.upload) ?? []
+            ]}
+            labels={['下载', '上传']}
+            format={calcTraffic}
+          />
+          <p className="text-xs text-foreground-500">
+            {valid
+              ? `${new Date(query.start).toLocaleString()} — ${new Date(query.end).toLocaleString()}`
+              : '—'}{' '}
+            · 按分钟记录连接流量；历史数据从{' '}
+            {data?.startedAt ? new Date(data.startedAt).toLocaleString() : '首次运行'} 开始采集。
+          </p>
+        </section>
+        <div className="usage-layout">
+          <section className="dashboard-panel">
+            <div className="flex justify-between items-center gap-2">
+              <h2>{label}用量</h2>
+              <InputGroup className="max-w-52">
+                <InputGroup.Input
+                  aria-label="筛选用量"
+                  placeholder="搜索…"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                />
+              </InputGroup>
+            </div>
+            <UsageTable
+              entries={rows}
+              selected={selected}
+              onSelect={(value) => {
+                setSelected(value)
+                setSubselected(null)
+              }}
+              sort={sort}
+              descending={descending}
+              onSort={(next) => {
+                if (next === sort) setDescending(!descending)
+                else {
+                  setSort(next)
+                  setDescending(true)
+                }
+              }}
+            />
+            {!rows.length && (
+              <p className="dashboard-empty">{isLoading ? '正在读取…' : '此时间范围内暂无记录'}</p>
+            )}
+          </section>
+          <section className="dashboard-panel">
+            <h2>
+              {selected ?? '详情'}
+              {selected !== null ? ` · ${subDimension === 'host' ? '域名' : '设备'}` : ''}
+            </h2>
+            {selected === null ? (
+              <p className="dashboard-empty">选择左侧项目，查看域名、设备和节点明细。</p>
+            ) : (
+              <>
+                <UsageTable
+                  entries={sub?.entries ?? []}
+                  selected={subselected}
+                  onSelect={setSubselected}
+                />
+                {subselected !== null && (
+                  <div className="mt-4">
+                    <h2>
+                      {subselected} · {detailDimension === 'sourceIP' ? '设备' : '节点'}
+                    </h2>
+                    <UsageTable entries={detail?.entries ?? []} />
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+        <div className="dashboard-grid">
+          <section className="dashboard-panel">
+            <h2>上传排行</h2>
+            {[...(data?.entries ?? [])]
+              .sort((a, b) => b.upload - a.upload)
+              .slice(0, 5)
+              .map((entry) => (
+                <button
+                  className="dashboard-rank"
+                  key={entry.label}
+                  onClick={() => setSelected(entry.label)}
+                >
+                  <span className="truncate">{entry.label}</span>
+                  <span>{calcTraffic(entry.upload)}</span>
+                </button>
+              ))}
+          </section>
+          <section className="dashboard-panel">
+            <h2>下载排行</h2>
+            {[...(data?.entries ?? [])]
+              .sort((a, b) => b.download - a.download)
+              .slice(0, 5)
+              .map((entry) => (
+                <button
+                  className="dashboard-rank"
+                  key={entry.label}
+                  onClick={() => setSelected(entry.label)}
+                >
+                  <span className="truncate">{entry.label}</span>
+                  <span>{calcTraffic(entry.download)}</span>
+                </button>
+              ))}
+          </section>
+        </div>
+      </div>
+      {clearOpen && (
+        <ConfirmModal
+          title="清空用量记录"
+          description="将清空全部用量和原有流量统计记录，随后重新累计。"
           onChange={(open) => {
-            if (!open) setShowClearConfirm(false)
+            if (!open) setClearOpen(false)
           }}
-          onConfirm={handleClear}
+          onConfirm={async () => {
+            try {
+              await clearTrafficStats()
+              setSelected(null)
+              setSubselected(null)
+              await refresh()
+              setClearOpen(false)
+            } catch (e) {
+              notify(e, { variant: 'danger' })
+            }
+          }}
         />
       )}
-
-      {/* 顶部指标卡片 */}
-      <div className="px-3 pt-2 pb-1 shrink-0">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {/* 卡片 1: 全景总流量 */}
-          <div className="rounded-xl border border-border/40 bg-surface/80 p-2.5 flex flex-col justify-between shadow-2xs">
-            <div className="flex items-center justify-between text-xs text-foreground-500 mb-1">
-              <span className="font-medium">全景总流量</span>
-              <IoStatsChart className="text-foreground-400 text-sm" />
-            </div>
-            <div className="text-lg font-bold font-mono text-foreground tracking-tight">
-              {calcTraffic(globalTotal)}
-            </div>
-            <div className="w-full h-1 bg-default-100 dark:bg-default-50/20 rounded-full overflow-hidden flex mt-2">
-              <div
-                style={{ width: `${globalUpRatio}%` }}
-                className="h-full bg-emerald-500"
-                title={`上传占比 ${globalUpRatio.toFixed(1)}%`}
-              />
-              <div
-                style={{ width: `${globalDownRatio}%` }}
-                className="h-full bg-sky-500"
-                title={`下载占比 ${globalDownRatio.toFixed(1)}%`}
-              />
-            </div>
-          </div>
-
-          {/* 卡片 2: 上行传输 */}
-          <div className="rounded-xl border border-border/40 bg-surface/80 p-2.5 flex flex-col justify-between shadow-2xs">
-            <div className="flex items-center justify-between text-xs text-foreground-500 mb-1">
-              <span className="font-medium">上行传输</span>
-              <span className="text-emerald-500 font-mono text-xs font-semibold">↑</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-emerald-600 dark:text-emerald-400 tracking-tight">
-              {calcTraffic(globalUpload)}
-            </div>
-          </div>
-
-          {/* 卡片 3: 下行传输 */}
-          <div className="rounded-xl border border-border/40 bg-surface/80 p-2.5 flex flex-col justify-between shadow-2xs">
-            <div className="flex items-center justify-between text-xs text-foreground-500 mb-1">
-              <span className="font-medium">下行传输</span>
-              <span className="text-sky-500 font-mono text-xs font-semibold">↓</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-sky-600 dark:text-sky-400 tracking-tight">
-              {calcTraffic(globalDownload)}
-            </div>
-          </div>
-
-          {/* 卡片 4: 统计维度项数与对账状态 */}
-          <div className="rounded-xl border border-border/40 bg-surface/80 p-2.5 flex flex-col justify-between shadow-2xs">
-            <div className="flex items-center justify-between text-xs text-foreground-500 mb-1">
-              <span className="font-medium">{dimensionLabels[dimension]} 概况</span>
-              {globalUnknown > 0 ? (
-                <Tooltip delay={0}>
-                  <span className="text-warning text-[10px] font-mono px-1.5 py-0.5 rounded bg-warning/10 cursor-help">
-                    ? {calcTraffic(globalUnknown)}
-                  </span>
-                  <Tooltip.Content placement="bottom">
-                    未归属流量：包含离线期间差额、快速关闭短连接或内核直连流量
-                  </Tooltip.Content>
-                </Tooltip>
-              ) : (
-                <span className="text-emerald-500 text-[10px] font-medium px-1.5 py-0.5 rounded bg-emerald-500/10">
-                  100% 归属
-                </span>
-              )}
-            </div>
-            <div className="text-lg font-bold font-mono text-foreground tracking-tight">
-              {filteredAndSortedItems.length}
-              <span className="text-xs font-normal text-foreground-400 ml-1">项</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 控制工具栏：维度分段选择器 + 搜索 + 规则子筛选 + 范围 + 排序 */}
-      <div className="px-3 py-2 flex flex-col gap-2 shrink-0 border-b border-border/30 bg-background/50 backdrop-blur-xs">
-        {/* 第一行：平铺分段维度选择器 */}
-        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar p-1 rounded-xl bg-default-100/60 dark:bg-default-50/20 border border-border/30">
-          {DIMENSIONS.map((dim) => {
-            const active = dimension === dim.id
-            return (
-              <button
-                key={dim.id}
-                type="button"
-                onClick={() => setDimension(dim.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer select-none ${
-                  active
-                    ? 'bg-background text-foreground shadow-xs'
-                    : 'text-foreground-500 hover:text-foreground hover:bg-default-200/50'
-                }`}
-              >
-                {dim.icon}
-                <span>{dim.label}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {/* 第二行：搜索过滤、规则子类别(若为规则维度)、时间跨度选择、排序字段与升降序 */}
-        <div className="flex items-center gap-2">
-          <InputGroup fullWidth className="relative h-8">
-            <InputGroup.Input
-              value={filter}
-              placeholder={`搜索${dimensionLabels[dimension]}...`}
-              onChange={(event) => setFilter(event.target.value)}
-              className="text-xs"
-            />
-            {filter && (
-              <InputGroup.Suffix>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  isIconOnly
-                  aria-label="清空"
-                  onPress={() => setFilter('')}
-                >
-                  ×
-                </Button>
-              </InputGroup.Suffix>
-            )}
-          </InputGroup>
-
-          {/* 当处于分流规则维度时，展示快速子分类切换 */}
-          {dimension === 'rules' && (
-            <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-default-100/80 dark:bg-default-50/30 border border-border/30 shrink-0">
-              <button
-                type="button"
-                onClick={() => setRuleCategory('all')}
-                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  ruleCategory === 'all'
-                    ? 'bg-background text-foreground shadow-2xs'
-                    : 'text-foreground-500 hover:text-foreground'
-                }`}
-              >
-                全部
-              </button>
-              <button
-                type="button"
-                onClick={() => setRuleCategory('ruleset')}
-                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  ruleCategory === 'ruleset'
-                    ? 'bg-background text-foreground shadow-2xs'
-                    : 'text-foreground-500 hover:text-foreground'
-                }`}
-              >
-                规则集
-              </button>
-              <button
-                type="button"
-                onClick={() => setRuleCategory('direct')}
-                className={`px-2 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer whitespace-nowrap ${
-                  ruleCategory === 'direct'
-                    ? 'bg-background text-foreground shadow-2xs'
-                    : 'text-foreground-500 hover:text-foreground'
-                }`}
-              >
-                单条/覆写
-              </button>
-            </div>
-          )}
-
-          <Select
-            aria-label="时间跨度"
-            className="w-28 shrink-0"
-            data-size="sm"
-            value={timeRange}
-            onChange={(value) => {
-              if (value) setTimeRange(value as TrafficTimeRange)
-            }}
-          >
-            <Select.Trigger className="data-[hover=true]:bg-default-200">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
-              <ListBox>
-                <ListBox.Item key="session" id="session" textValue="本次内核">
-                  本次内核
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="today" id="today" textValue="今日">
-                  今日
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="7d" id="7d" textValue="近 7 天">
-                  近 7 天
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="30d" id="30d" textValue="近 30 天">
-                  近 30 天
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="all" id="all" textValue="全部历史">
-                  全部历史
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              </ListBox>
-            </Select.Popover>
-          </Select>
-
-          <Select
-            aria-label="排序字段"
-            className="w-28 shrink-0"
-            data-size="sm"
-            value={sortBy}
-            onChange={(value) => {
-              if (value) setSortBy(value as 'total' | 'upload' | 'download')
-            }}
-          >
-            <Select.Trigger className="data-[hover=true]:bg-default-200">
-              <Select.Value />
-              <Select.Indicator />
-            </Select.Trigger>
-            <Select.Popover placement="bottom" shouldFlip containerPadding={56}>
-              <ListBox>
-                <ListBox.Item key="total" id="total" textValue="总流量">
-                  总流量
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="upload" id="upload" textValue="上传量">
-                  上传量
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-                <ListBox.Item key="download" id="download" textValue="下载量">
-                  下载量
-                  <ListBox.ItemIndicator />
-                </ListBox.Item>
-              </ListBox>
-            </Select.Popover>
-          </Select>
-
-          <Button
-            size="sm"
-            isIconOnly
-            aria-label={sortDirection === 'asc' ? '升序' : '降序'}
-            onPress={() => setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))}
-            variant="primary"
-            data-color="default"
-            className="bg-content2 shrink-0"
-          >
-            {sortDirection === 'asc' ? (
-              <HiSortAscending className="text-lg" />
-            ) : (
-              <HiSortDescending className="text-lg" />
-            )}
-          </Button>
-        </div>
-      </div>
-
-      {/* 统计明细列表 (虚拟滚动) */}
-      <div className="flex-1 min-h-0">
-        {filteredAndSortedItems.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-2 text-center text-foreground-400">
-            <IoStatsChart className="text-3xl text-foreground-300" />
-            <p className="text-sm font-medium">
-              {filter ? '没有匹配的流量统计项' : '所选时间跨度暂无流量记录'}
-            </p>
-            {filter && (
-              <Button size="sm" variant="ghost" onPress={() => setFilter('')}>
-                清除搜索条件
-              </Button>
-            )}
-          </div>
-        ) : (
-          <Virtuoso
-            className="h-full"
-            data={filteredAndSortedItems}
-            itemContent={(index, item) => {
-              const isConnection = item.kind === 'connection'
-              const data = item.data
-              const total = data.total
-              const upload = data.upload
-              const download = data.download
-              const relPercent = Math.max(1, Math.min(100, (total / maxItemTotal) * 100))
-              const upPercent = total > 0 ? (upload / total) * 100 : 0
-              const downPercent = total > 0 ? (download / total) * 100 : 0
-              const globalShare =
-                stats && stats.total > 0 ? ((total / stats.total) * 100).toFixed(1) : '0.0'
-
-              if (isConnection) {
-                const conn = item.data as TrafficConnectionItem
-                const isUdp = conn.network?.toLowerCase() === 'udp'
-                return (
-                  <div
-                    key={conn.id}
-                    className={`px-3 pb-1.5 ${index === 0 ? 'pt-2' : ''}`}
-                    style={{ minHeight: 74 }}
-                  >
-                    <div className="rounded-xl border border-border/40 bg-surface/80 hover:bg-default-100/40 hover:border-border/80 transition-colors p-2.5 shadow-2xs">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          {renderRankBadge(index)}
-                          <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span
-                                className={`text-[10px] px-1 py-0.5 rounded font-mono font-medium uppercase leading-none shrink-0 ${
-                                  isUdp
-                                    ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400'
-                                    : 'bg-sky-500/10 text-sky-600 dark:text-sky-400'
-                                }`}
-                              >
-                                {conn.network || 'TCP'}
-                              </span>
-                              <span className="truncate text-sm font-medium select-text">
-                                {conn.destination}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1.5 text-xs text-foreground-400 truncate">
-                              {conn.process && (
-                                <>
-                                  <span className="truncate max-w-[130px] text-foreground-500 font-medium">
-                                    {conn.process}
-                                  </span>
-                                  <span>•</span>
-                                </>
-                              )}
-                              <span className="truncate max-w-[140px] flag-emoji">
-                                {conn.node}
-                              </span>
-                              {conn.rule && (
-                                <>
-                                  <span>•</span>
-                                  <span className="truncate max-w-[120px]">
-                                    {conn.rule}
-                                    {conn.rulePayload ? `(${conn.rulePayload})` : ''}
-                                  </span>
-                                </>
-                              )}
-                              {conn.start && (
-                                <>
-                                  <span>•</span>
-                                  <span className="shrink-0 font-mono text-[11px]">
-                                    {formatTime(conn.start)}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 流量数据列 */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="flex flex-col items-end font-mono text-[11px] leading-tight">
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              ↑ {calcTraffic(conn.upload)}
-                            </span>
-                            <span className="text-sky-600 dark:text-sky-400">
-                              ↓ {calcTraffic(conn.download)}
-                            </span>
-                          </div>
-                          <div className="px-2 py-1 rounded-md bg-default-100 dark:bg-default-50/40 text-foreground font-mono text-xs font-semibold">
-                            {calcTraffic(conn.total)}
-                          </div>
-                          <div className="w-11 text-right font-mono text-[11px] text-foreground-400">
-                            {globalShare}%
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 流量占比可视化指示条 */}
-                      <div className="w-full h-1 bg-default-100 dark:bg-default-50/20 rounded-full overflow-hidden mt-2">
-                        <div
-                          style={{ width: `${relPercent}%` }}
-                          className="h-full flex overflow-hidden rounded-full"
-                        >
-                          <div
-                            style={{ width: `${upPercent}%` }}
-                            className="h-full bg-emerald-500/80"
-                          />
-                          <div
-                            style={{ width: `${downPercent}%` }}
-                            className="h-full bg-sky-500/80"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              }
-
-              // 汇总维度：节点、策略组、分流规则、域名、进程
-              const summary = item.data as TrafficSummaryItem
-              return (
-                <div
-                  key={summary.name}
-                  className={`px-3 pb-1.5 ${index === 0 ? 'pt-2' : ''}`}
-                  style={{ minHeight: 64 }}
-                >
-                  <div className="rounded-xl border border-border/40 bg-surface/80 hover:bg-default-100/40 hover:border-border/80 transition-colors p-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        {renderRankBadge(index)}
-
-                        {dimension === 'rules' ? (
-                          (() => {
-                            const { type, payload } = parseRuleDisplay(summary.name)
-                            const isSet = type.toLowerCase() === 'ruleset'
-                            return (
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium uppercase shrink-0 ${
-                                    isSet
-                                      ? 'bg-purple-500/15 text-purple-600 dark:text-purple-400 border border-purple-500/25'
-                                      : 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25'
-                                  }`}
-                                >
-                                  {isSet ? '规则集' : type}
-                                </span>
-                                <span className="truncate text-sm font-medium text-foreground select-text font-mono text-[13px]">
-                                  {payload || type}
-                                </span>
-                                {!isSet && (
-                                  <span className="text-[10px] text-foreground-400 px-1 py-0.2 rounded bg-default-100 dark:bg-default-50/40 shrink-0">
-                                    单条/覆写
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })()
-                        ) : dimension === 'hosts' ? (
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <AiOutlineGlobal className="text-foreground-400 shrink-0 text-sm" />
-                            <span className="truncate text-sm font-medium text-foreground select-text font-mono text-[13px]">
-                              {summary.name}
-                            </span>
-                          </div>
-                        ) : dimension === 'processes' ? (
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <LuCpu className="text-foreground-400 shrink-0 text-sm" />
-                            <span className="truncate text-sm font-medium text-foreground select-text">
-                              {summary.name}
-                            </span>
-                          </div>
-                        ) : dimension === 'groups' ? (
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <LuGroup className="text-foreground-400 shrink-0 text-sm" />
-                            <span className="truncate text-sm font-medium text-foreground">
-                              {summary.name}
-                            </span>
-                          </div>
-                        ) : (
-                          // nodes
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="truncate text-sm font-medium text-foreground flag-emoji">
-                              {summary.name}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 流量数据列 */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <div className="flex flex-col items-end font-mono text-[11px] leading-tight">
-                          <span className="text-emerald-600 dark:text-emerald-400">
-                            ↑ {calcTraffic(summary.upload)}
-                          </span>
-                          <span className="text-sky-600 dark:text-sky-400">
-                            ↓ {calcTraffic(summary.download)}
-                          </span>
-                        </div>
-                        <div className="px-2 py-1 rounded-md bg-default-100 dark:bg-default-50/40 text-foreground font-mono text-xs font-semibold">
-                          {calcTraffic(summary.total)}
-                        </div>
-                        <div className="w-11 text-right font-mono text-[11px] text-foreground-400">
-                          {globalShare}%
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 流量占比可视化指示条 */}
-                    <div className="w-full h-1 bg-default-100 dark:bg-default-50/20 rounded-full overflow-hidden mt-2">
-                      <div
-                        style={{ width: `${relPercent}%` }}
-                        className="h-full flex overflow-hidden rounded-full"
-                      >
-                        <div
-                          style={{ width: `${upPercent}%` }}
-                          className="h-full bg-emerald-500/80"
-                        />
-                        <div
-                          style={{ width: `${downPercent}%` }}
-                          className="h-full bg-sky-500/80"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            }}
-          />
-        )}
-      </div>
+      {pendingRetention !== null && (
+        <ConfirmModal
+          title="缩短数据保留时长"
+          description="超出保留时长的用量记录会被永久删除。"
+          onChange={(open) => {
+            if (!open) setPendingRetention(null)
+          }}
+          onConfirm={async () => {
+            await changeRetention(pendingRetention)
+            setPendingRetention(null)
+          }}
+        />
+      )}
     </BasePage>
   )
 }
-
-export default TrafficPage
+type Sort = 'label' | 'upload' | 'download' | 'total' | 'count'
+function UsageTable({
+  entries,
+  selected,
+  onSelect,
+  sort,
+  descending,
+  onSort
+}: {
+  entries: UsageEntry[]
+  selected?: string | null
+  onSelect?: (label: string) => void
+  sort?: Sort
+  descending?: boolean
+  onSort?: (field: Sort) => void
+}) {
+  const columns: Array<[Sort, string]> = [
+    ['label', '名称'],
+    ['upload', '上传'],
+    ['download', '下载'],
+    ['total', '总量'],
+    ['count', '连接']
+  ]
+  return (
+    <div className="overflow-auto max-h-100">
+      <table className="data-table">
+        <thead>
+          <tr>
+            {columns.map(([id, name]) => (
+              <th key={id}>
+                <button onClick={() => onSort?.(id)}>
+                  {name}
+                  {sort === id ? (descending ? ' ↓' : ' ↑') : ''}
+                </button>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((entry) => (
+            <tr
+              key={entry.label}
+              data-selected={selected === entry.label}
+              onClick={() => onSelect?.(entry.label)}
+            >
+              <td title={entry.label}>
+                {onSelect ? (
+                  <button onClick={() => onSelect(entry.label)}>{entry.label}</button>
+                ) : (
+                  entry.label
+                )}
+              </td>
+              <td>{calcTraffic(entry.upload)}</td>
+              <td>{calcTraffic(entry.download)}</td>
+              <td>{calcTraffic(entry.total)}</td>
+              <td>{entry.count}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}

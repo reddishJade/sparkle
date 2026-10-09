@@ -10,7 +10,7 @@ import {
   Override,
   Profiles,
   Proxies,
-  Resources,
+  Home,
   Rules,
   Settings,
   Sniffer,
@@ -32,6 +32,7 @@ function startupRoute(element: ReactNode): ReactNode {
 }
 
 const routes = [
+  { path: '/resources', element: <Navigate to="/rules" replace /> },
   {
     path: '/mihomo',
     element: startupRoute(<Mihomo />)
@@ -53,8 +54,8 @@ const routes = [
     element: startupRoute(<Rules />)
   },
   {
-    path: '/resources',
-    element: startupRoute(<Resources />)
+    path: '/home',
+    element: startupRoute(<Home />)
   },
   {
     path: '/dns',
@@ -90,7 +91,7 @@ const routes = [
   },
   {
     path: '/',
-    element: <Navigate to="/proxies" />
+    element: <Navigate to="/home" replace />
   }
 ]
 
