@@ -122,7 +122,7 @@ window.electron = {
     send: () => {},
     invoke: async (name, ...args) => {
       window.__calls.push([name, ...args])
-      if (name === 'getAppConfig') return appConfig
+      if (name === 'getAppConfig') return structuredClone(appConfig)
       if (name === 'patchAppConfig') return Object.assign(appConfig, args[0])
       if (name === 'getControledMihomoConfig' || name === 'mihomoConfig')
         return {
@@ -139,6 +139,7 @@ window.electron = {
         return {
           rules: [
             {
+              index: 0,
               type: 'DomainSuffix',
               payload: 'example.com',
               proxy: 'Proxy',
@@ -146,6 +147,7 @@ window.electron = {
               extra: { hitCount: 5, disabled: false }
             },
             {
+              index: 1,
               type: 'Match',
               payload: '',
               proxy: 'DIRECT',
@@ -158,7 +160,13 @@ window.electron = {
       if (name === 'getVersion') return '1.26.9'
       if (name === 'getNetworkInfo')
         return { address: '203.0.113.42', location: 'Singapore', org: 'Example ISP' }
-      if (name === 'getNetworkLatencies') return { Google: 53, Cloudflare: 26, GitHub: 74 }
+      if (name === 'getNetworkLatencies')
+        return Object.fromEntries(
+          (args[0] ?? [{ name: 'Google' }, { name: 'Cloudflare' }, { name: 'GitHub' }]).map(
+            (target, index) => [target.name, 53 + index * 10]
+          )
+        )
+      if (name === 'getCachedMihomoLogs') return []
       if (name === 'getTrafficStats')
         return {
           totalUpload: 44000,
@@ -250,6 +258,8 @@ window.electron = {
       if (name === 'getAppName') return 'Firefox'
       if (name === 'getIconDataURL') return ''
       if (name === 'findSystemMihomo') return []
+      if (name === 'resolveThemes') return []
+      if (name === 'checkAutoRun') return false
       if (name === 'mihomoCloseConnection') {
         connections = connections.filter((c) => c.id !== args[0])
         return {}
@@ -275,4 +285,116 @@ setInterval(() => {
 window.__setTheme = (theme) => {
   appConfig.appTheme = theme
   window.__emit('appConfigUpdated', {})
+}
+
+// Representative volumes for layout review; functional tests keep the smaller fixture.
+window.__setDenseFixtures = () => {
+  const invoke = window.electron.ipcRenderer.invoke
+  window.electron.ipcRenderer.invoke = async (name, ...args) => {
+    const result = await invoke(name, ...args)
+    if (name === 'mihomoRules') {
+      const names = [
+        'emby.yzt.lol',
+        'cnemby.yzt.lol',
+        'reject',
+        'private',
+        'direct',
+        'connectivity',
+        'ai@cn',
+        'apple@cn',
+        'microsoft@cn',
+        'cdn',
+        'domestic',
+        'domestic@ip',
+        'google',
+        'telegram',
+        'github',
+        'netflix',
+        'youtube',
+        'spotify',
+        'steam',
+        'games',
+        'proxy',
+        'ads',
+        'lan',
+        'custom-long-domain-name.example.com',
+        'final',
+        'Match'
+      ]
+      const targets = ['DIRECT', 'REJECT', 'CDN', 'AI', 'USA', 'Proxy', 'Select', 'Google', 'Final']
+      return {
+        rules: names.map((payload, index) => ({
+          index,
+          payload,
+          type: index < 2 ? 'Domain' : index === 25 ? 'Match' : 'RuleSet',
+          proxy: targets[index % targets.length],
+          size: 1,
+          extra: {
+            disabled: false,
+            hitCount: index === 2 ? 3527 : index * 7,
+            missCount: 7298 - index * 137,
+            hitAt: new Date(Date.now() - 60000).toISOString(),
+            missAt: new Date(Date.now() - 60000).toISOString()
+          }
+        }))
+      }
+    }
+    if (name === 'mihomoProxyProviders') {
+      return {
+        providers: Object.fromEntries(
+          [
+            ['INIF', 5],
+            ['Snow', 11]
+          ].map(([name, count], i) => [
+            name,
+            {
+              name,
+              type: 'Proxy',
+              vehicleType: 'HTTP',
+              updatedAt: new Date(Date.now() - 360000).toISOString(),
+              testUrl: 'https://www.google.com/generate_204',
+              subscriptionInfo: {
+                Upload: 4000000000,
+                Download: i ? 126000000000 : 34000000000,
+                Total: i ? 1099511627776 : 107374182400,
+                Expire: 1795000000
+              },
+              proxies: Array.from({ length: count }, (_, index) => ({
+                ...proxies[index % proxies.length],
+                name:
+                  ['HK香港', 'JP日本', 'SG新加坡', 'TW台湾', 'US美国'][index % 5] +
+                  String(index + 1).padStart(2, '0'),
+                type: i ? 'Vless' : 'AnyTLS',
+                history: [
+                  { time: new Date().toISOString(), delay: index % 4 === 1 ? 0 : 90 + index * 7 }
+                ]
+              }))
+            }
+          ])
+        )
+      }
+    }
+    return result
+  }
+  connections = Array.from({ length: 31 }, (_, index) => ({
+    ...structuredClone(connections[index % 2]),
+    id: 'dense-' + index,
+    chains: [
+      ['DIRECT', 'DIRECT'],
+      ['usFrontier家宽', 'USA'],
+      ['日本01', 'Proxy'],
+      ['香港02', 'CDN']
+    ][index % 4],
+    rule: 'RuleSet',
+    rulePayload: [
+      'domestic',
+      'connectivity',
+      'domestic@ip',
+      'ai',
+      'google',
+      'proxy',
+      'streaming',
+      'Match'
+    ][index % 8]
+  }))
 }

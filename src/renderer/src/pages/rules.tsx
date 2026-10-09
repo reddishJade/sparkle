@@ -3,7 +3,7 @@ import { Separator, InputGroup, Button } from '@heroui/react'
 import RuleProvider from '@renderer/components/resources/rule-provider'
 import BasePage from '@renderer/components/base/base-page'
 import RuleItem from '@renderer/components/rules/rule-item'
-import { Virtuoso } from 'react-virtuoso'
+import { VirtuosoGrid } from 'react-virtuoso'
 import { MdSort } from 'react-icons/md'
 import { useMemo, useState } from 'react'
 import { useRules } from '@renderer/hooks/use-rules'
@@ -42,10 +42,9 @@ const Rules: React.FC = () => {
   }, [rules])
 
   return (
-    <BasePage
-      title="分流规则"
-      header={
-        <div className="flex gap-1 app-nodrag">
+    <BasePage title="分流规则">
+      <div className="flex h-full flex-col">
+        <div className="page-tabs">
           {[
             ['rules', '规则'],
             ['providers', '规则提供者']
@@ -63,108 +62,120 @@ const Rules: React.FC = () => {
             </Button>
           ))}
         </div>
-      }
-    >
-      {tab === 'providers' ? (
-        <RuleProvider />
-      ) : (
-        <div className="flex flex-col h-full">
-          <div className="shrink-0 bg-background">
-            <div className="flex p-2">
-              <InputGroup fullWidth>
-                <InputGroup.Input
-                  value={filter}
-                  placeholder="筛选过滤"
-                  onChange={(event) => setFilter(event.target.value)}
+        <div className="flex-1 min-h-0">
+          {tab === 'providers' ? (
+            <RuleProvider />
+          ) : (
+            <div className="flex flex-col h-full">
+              <div className="shrink-0 bg-background">
+                <div className="flex p-2">
+                  <InputGroup fullWidth>
+                    <InputGroup.Input
+                      value={filter}
+                      placeholder="筛选过滤"
+                      onChange={(event) => setFilter(event.target.value)}
+                    />
+                    {filter && (
+                      <InputGroup.Suffix>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          isIconOnly
+                          aria-label="清空"
+                          onPress={(event) => {
+                            setFilter('')
+                            event.target
+                              .closest('[data-slot="input-group"]')
+                              ?.querySelector('input')
+                              ?.focus()
+                          }}
+                        >
+                          ×
+                        </Button>
+                      </InputGroup.Suffix>
+                    )}
+                  </InputGroup>
+                </div>
+                <div className="rule-filterbar">
+                  <div className="rule-filter-group" role="group" aria-label="规则状态">
+                    {(
+                      [
+                        ['all', '全部'],
+                        ['enabled', '已启用'],
+                        ['disabled', '已禁用']
+                      ] as const
+                    ).map(([id, label]) => (
+                      <Button
+                        key={id}
+                        size="sm"
+                        variant={enabled === id ? 'primary' : 'ghost'}
+                        onPress={() => setEnabled(id)}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="rule-filter-group" role="group" aria-label="规则类型">
+                    {types.map((value) => (
+                      <Button
+                        key={value}
+                        size="sm"
+                        variant={type === value ? 'primary' : 'ghost'}
+                        onPress={() => setType(type === value ? '' : value)}
+                      >
+                        {value}
+                        <span className="text-xs opacity-60">
+                          {rules?.rules.filter((rule) => rule.type === value).length}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                  <div
+                    className="rule-filter-group rule-filter-targets"
+                    role="group"
+                    aria-label="目标策略"
+                  >
+                    {targets.map((value) => (
+                      <Button
+                        key={value}
+                        size="sm"
+                        variant={target === value ? 'primary' : 'ghost'}
+                        onPress={() => setTarget(target === value ? '' : value)}
+                      >
+                        {value}
+                        <span className="text-xs opacity-60">
+                          {rules?.rules.filter((rule) => rule.proxy === value).length}
+                        </span>
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    size="sm"
+                    isIconOnly
+                    variant={sortByHits ? 'primary' : 'ghost'}
+                    aria-label="按命中次数排序"
+                    onPress={() => setSortByHits(!sortByHits)}
+                  >
+                    <MdSort />
+                  </Button>
+                </div>
+                <Separator />
+              </div>
+              <div className="rules-workspace flex-1 min-h-0 mt-px">
+                <VirtuosoGrid
+                  listClassName="rules-grid"
+                  itemClassName="rules-grid-item"
+                  data={filteredRules}
+                  context={{ totalHitCount }}
+                  itemContent={(_i, rule, context) => (
+                    <RuleItem rule={rule} totalHitCount={context.totalHitCount} />
+                  )}
                 />
-                {filter && (
-                  <InputGroup.Suffix>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      isIconOnly
-                      aria-label="清空"
-                      onPress={(event) => {
-                        setFilter('')
-                        event.target
-                          .closest('[data-slot="input-group"]')
-                          ?.querySelector('input')
-                          ?.focus()
-                      }}
-                    >
-                      ×
-                    </Button>
-                  </InputGroup.Suffix>
-                )}
-              </InputGroup>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-1 px-2 pb-2">
-              {(
-                [
-                  ['all', '全部'],
-                  ['enabled', '已启用'],
-                  ['disabled', '已禁用']
-                ] as const
-              ).map(([id, label]) => (
-                <Button
-                  key={id}
-                  size="sm"
-                  variant={enabled === id ? 'primary' : 'ghost'}
-                  onPress={() => setEnabled(id)}
-                >
-                  {label}
-                </Button>
-              ))}
-              {types.map((value) => (
-                <Button
-                  key={value}
-                  size="sm"
-                  variant={type === value ? 'primary' : 'ghost'}
-                  onPress={() => setType(type === value ? '' : value)}
-                >
-                  {value}
-                  <span className="text-xs opacity-60">
-                    {rules?.rules.filter((rule) => rule.type === value).length}
-                  </span>
-                </Button>
-              ))}
-              <span className="mx-1 h-5 border-l border-divider" />
-              {targets.map((value) => (
-                <Button
-                  key={value}
-                  size="sm"
-                  variant={target === value ? 'primary' : 'ghost'}
-                  onPress={() => setTarget(target === value ? '' : value)}
-                >
-                  {value}
-                  <span className="text-xs opacity-60">
-                    {rules?.rules.filter((rule) => rule.proxy === value).length}
-                  </span>
-                </Button>
-              ))}
-              <Button
-                size="sm"
-                isIconOnly
-                variant={sortByHits ? 'primary' : 'ghost'}
-                aria-label="按命中次数排序"
-                onPress={() => setSortByHits(!sortByHits)}
-              >
-                <MdSort />
-              </Button>
-            </div>
-            <Separator />
-          </div>
-          <div className="flex-1 min-h-0 mt-px">
-            <Virtuoso
-              data={filteredRules}
-              context={{ totalHitCount }}
-              itemContent={(i, rule, context) => (
-                <RuleItem index={i} rule={rule} totalHitCount={context.totalHitCount} />
-              )}
-            />
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </BasePage>
   )
 }

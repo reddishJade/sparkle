@@ -35,7 +35,7 @@ const GeoData: React.FC = () => {
   }, [geoxUrl])
 
   return (
-    <SettingCard header="地理数据库（Geo Data）">
+    <SettingCard header="地理数据库">
       <SettingItem compatKey="legacy" title="GeoIP-DAT 数据库" divider>
         <div className="flex w-[70%]">
           {geoipInput !== geoxUrl.geoip && (

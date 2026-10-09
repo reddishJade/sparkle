@@ -19,6 +19,7 @@ export default function NetworkTopology({
   const [frozen, setFrozen] = useState<ControllerConnectionDetail[] | null>(null)
   const [overrides, setOverrides] = useState<Record<string, boolean>>({})
   const [zoom, setZoom] = useState(1)
+  const [large, setLarge] = useState(false)
   const panelRef = useRef<HTMLElement>(null)
   const [availableWidth, setAvailableWidth] = useState(0)
   useEffect(() => {
@@ -35,11 +36,11 @@ export default function NetworkTopology({
     const links: Array<{ x1: number; y1: number; x2: number; y2: number }> = []
     let row = 0
     function walk(node: TopologyNode, depth: number): { x: number; y: number } {
-      const expanded = overrides[node.id] ?? (node.type !== 'rule' && node.type !== 'client')
+      const expanded = overrides[node.id] ?? (node.type === 'root' || node.type === 'group')
       const children = expanded ? node.children.map((child) => walk(child, depth + 1)) : []
       const y = children.length
         ? (children[0].y + children[children.length - 1].y) / 2
-        : row++ * 76 + 38
+        : row++ * 46 + 24
       const x = depth * 180 + 16
       nodes.push({ node, x, y, expanded })
       children.forEach((child) => links.push({ x1: x + 154, y1: y, x2: child.x, y2: child.y }))
@@ -49,13 +50,16 @@ export default function NetworkTopology({
     return {
       nodes,
       links,
-      height: Math.max(200, row * 76 + 20),
+      height: Math.max(130, row * 46 + 20),
       width: Math.max(...nodes.map(({ x }) => x + 170))
     }
   }, [tree, overrides])
   const scale = Math.min(1, availableWidth > 0 ? availableWidth / width : 1) * zoom
   return (
-    <section ref={panelRef} className="dashboard-panel topology-panel">
+    <section
+      ref={panelRef}
+      className={`dashboard-panel topology-panel ${large ? 'topology-large' : ''}`}
+    >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <h2>网络拓扑</h2>
@@ -64,6 +68,9 @@ export default function NetworkTopology({
           </p>
         </div>
         <div className="flex gap-1">
+          <Button size="sm" variant="ghost" aria-expanded={large} onPress={() => setLarge(!large)}>
+            {large ? '收起视图' : '展开视图'}
+          </Button>
           <Button
             size="sm"
             variant={frozen ? 'primary' : 'ghost'}
@@ -132,7 +139,7 @@ export default function NetworkTopology({
               />
             ))}
             {nodes.map(({ node, x, y, expanded }) => (
-              <foreignObject key={node.id} x={x} y={y - 28} width="154" height="60">
+              <foreignObject key={node.id} x={x} y={y - 20} width="154" height="44">
                 <button
                   type="button"
                   className={`topology-node ${selected?.id === node.id ? 'selected' : ''}`}

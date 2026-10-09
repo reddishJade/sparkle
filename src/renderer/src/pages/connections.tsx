@@ -1024,24 +1024,18 @@ const Connections: React.FC = () => {
               </Badge>
             </Badge.Anchor>
           </div>
-          <Tooltip delay={0}>
-            <Button
-              size="sm"
-              isIconOnly
-              aria-label={isEffectivePaused ? '继续刷新' : '暂停刷新'}
-              onPress={() => setIsManualPaused((p) => !p)}
-              variant={isEffectivePaused ? 'primary' : 'ghost'}
-              data-color={isEffectivePaused ? 'warning' : 'default'}
-              className="app-nodrag ml-2"
-            >
-              {isEffectivePaused ? <IoPlay className="text-lg" /> : <IoPause className="text-lg" />}
-            </Button>
-            <Tooltip.Content placement="bottom">
-              {isEffectivePaused
-                ? '继续刷新 (快捷键: 空格键 / 松开 Ctrl)'
-                : '暂停刷新 (快捷键: 空格键 / 按住 Ctrl 临时暂停)'}
-            </Tooltip.Content>
-          </Tooltip>
+          <Button
+            size="sm"
+            isIconOnly
+            aria-label={isEffectivePaused ? '继续刷新' : '暂停刷新'}
+            onPress={() => setIsManualPaused((p) => !p)}
+            variant={isEffectivePaused ? 'primary' : 'ghost'}
+            data-color={isEffectivePaused ? 'warning' : 'default'}
+            className="app-nodrag ml-2"
+          >
+            {isEffectivePaused ? <IoPlay className="text-lg" /> : <IoPause className="text-lg" />}
+          </Button>
+
           <Button
             size="sm"
             isIconOnly
@@ -1056,20 +1050,17 @@ const Connections: React.FC = () => {
           >
             <MdTune className="text-lg" />
           </Button>
-          <Tooltip delay={0}>
-            <Button
-              size="sm"
-              isIconOnly
-              aria-label="流量统计"
-              onPress={() => navigate('/traffic')}
-              variant="ghost"
-              data-color="default"
-              className="app-nodrag"
-            >
-              <IoStatsChart className="text-lg" />
-            </Button>
-            <Tooltip.Content placement="bottom">流量统计</Tooltip.Content>
-          </Tooltip>
+          <Button
+            size="sm"
+            isIconOnly
+            aria-label="流量统计"
+            onPress={() => navigate('/traffic')}
+            variant="ghost"
+            data-color="default"
+            className="app-nodrag"
+          >
+            <IoStatsChart className="text-lg" />
+          </Button>
         </>
       }
     >

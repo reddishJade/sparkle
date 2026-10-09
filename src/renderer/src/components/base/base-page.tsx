@@ -71,6 +71,7 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
           >
             {props.header}
             <Button
+              aria-label={onTop ? '取消置顶' : '置顶窗口'}
               data-react-aria-top-layer="true"
               style={{ zIndex: 60 }}
               size="sm"

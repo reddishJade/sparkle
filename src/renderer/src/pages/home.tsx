@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom'
 import BasePage from '@renderer/components/base/base-page'
 import NetworkTopology from '@renderer/components/home/network-topology'
 import HistoryChart from '@renderer/components/home/history-chart'
+import NetworkLatency from '@renderer/components/home/network-latency'
+import ServiceReachability from '@renderer/components/home/service-reachability'
 import NetworkInfo from '@renderer/components/home/network-info'
 import { useLiveData } from '@renderer/hooks/use-live-data'
 import { calcTraffic } from '@renderer/utils/calc'
@@ -87,25 +89,31 @@ export default function Home() {
           ))}
         </div>
         <NetworkTopology connections={connections} />
-        <div className="home-secondary">
-          <section className="dashboard-panel">
-            <h2>活跃节点</h2>
-            {topProxies.length ? (
-              topProxies.map(([name, speed]) => (
-                <button
-                  key={name}
-                  className="dashboard-rank"
-                  onClick={() => navigate('/connections')}
-                >
-                  <span className="truncate">{name}</span>
-                  <span>{bytes(speed)}/s</span>
-                </button>
-              ))
-            ) : (
-              <p className="dashboard-empty">暂无活动连接</p>
-            )}
+        <div className="home-bottom">
+          <section className="dashboard-panel home-unit">
+            <div className="home-unit-heading">
+              <h2>活跃节点</h2>
+            </div>
+            <div className="home-unit-body">
+              {topProxies.length ? (
+                topProxies.map(([name, speed]) => (
+                  <button
+                    key={name}
+                    className="dashboard-rank"
+                    onClick={() => navigate('/connections')}
+                  >
+                    <span className="truncate">{name}</span>
+                    <span>{bytes(speed)}/s</span>
+                  </button>
+                ))
+              ) : (
+                <p className="dashboard-empty">暂无活动连接</p>
+              )}
+            </div>
           </section>
           <NetworkInfo />
+          <NetworkLatency />
+          <ServiceReachability />
         </div>
       </div>
     </BasePage>

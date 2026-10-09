@@ -703,9 +703,28 @@ const Proxies: React.FC = () => {
 
   return (
     <BasePage
-      title="代理组"
+      title={tab === 'providers' ? '代理提供者' : '代理组'}
       header={
         <div className="flex gap-1 app-nodrag">
+          <Button
+            size="sm"
+            isIconOnly
+            aria-label="代理设置"
+            onPress={() => {
+              setIsSettingDrawerOpen(true)
+              setSettingDrawerReopenSignal((signal) => signal + 1)
+            }}
+            variant="ghost"
+            data-color="default"
+            className="app-nodrag"
+          >
+            <MdTune className="text-lg" />
+          </Button>
+        </div>
+      }
+    >
+      <div className="flex h-full flex-col">
+        <div className="page-tabs">
           <Button
             size="sm"
             variant={tab === 'groups' ? 'primary' : 'ghost'}
@@ -720,51 +739,39 @@ const Proxies: React.FC = () => {
           >
             代理提供者
           </Button>
-          <Button
-            size="sm"
-            isIconOnly
-            onPress={() => {
-              setIsSettingDrawerOpen(true)
-              setSettingDrawerReopenSignal((signal) => signal + 1)
-            }}
-            variant="ghost"
-            data-color="default"
-            className="app-nodrag"
-          >
-            <MdTune className="text-lg" />
-          </Button>
         </div>
-      }
-    >
-      {isSettingDrawerOpen && (
-        <ProxySettingDrawer
-          reopenSignal={settingDrawerReopenSignal}
-          onClose={() => setIsSettingDrawerOpen(false)}
-        />
-      )}
-      {tab === 'providers' ? (
-        <ProxyProvider />
-      ) : mode === 'direct' ? (
-        <div className="h-full w-full flex justify-center items-center">
-          <div className="flex flex-col items-center">
-            <MdDoubleArrow className="text-foreground-500 text-[100px]" />
-            <h2 className="text-foreground-500 text-[20px]">直连模式</h2>
-          </div>
-        </div>
-      ) : (
-        <div className="h-[calc(100vh-50px)]">
-          <GroupedVirtuoso
-            ref={virtuosoRef}
-            scrollerRef={scrollerRef}
-            initialScrollTop={initialScrollTop}
-            groupCounts={groupCounts}
-            groupContent={groupContent}
-            itemContent={itemContent}
-            defaultItemHeight={72}
-            overscan={200}
+        {isSettingDrawerOpen && (
+          <ProxySettingDrawer
+            reopenSignal={settingDrawerReopenSignal}
+            onClose={() => setIsSettingDrawerOpen(false)}
           />
+        )}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          {tab === 'providers' ? (
+            <ProxyProvider />
+          ) : mode === 'direct' ? (
+            <div className="h-full w-full flex justify-center items-center">
+              <div className="flex flex-col items-center">
+                <MdDoubleArrow className="text-foreground-500 text-[100px]" />
+                <h2 className="text-foreground-500 text-[20px]">直连模式</h2>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full">
+              <GroupedVirtuoso
+                ref={virtuosoRef}
+                scrollerRef={scrollerRef}
+                initialScrollTop={initialScrollTop}
+                groupCounts={groupCounts}
+                groupContent={groupContent}
+                itemContent={itemContent}
+                defaultItemHeight={72}
+                overscan={200}
+              />
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </BasePage>
   )
 }

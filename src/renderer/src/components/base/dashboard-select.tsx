@@ -5,16 +5,19 @@ export default function DashboardSelect({
   value,
   options,
   onChange,
+  isDisabled = false,
   className = 'w-32'
 }: {
   label: string
   value: string
   options: Array<[string, string]>
   onChange: (value: string) => void
+  isDisabled?: boolean
   className?: string
 }) {
   return (
     <Select
+      isDisabled={isDisabled}
       aria-label={label}
       value={value}
       data-size="sm"

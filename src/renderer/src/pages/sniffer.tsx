@@ -1,3 +1,4 @@
+import { FiSave } from 'react-icons/fi'
 import { Button, Input, Switch } from '@heroui/react'
 
 import BasePage from '@renderer/components/base/base-page'
@@ -86,6 +87,8 @@ const Sniffer: React.FC = () => {
         changed && (
           <Button
             size="sm"
+            isIconOnly
+            aria-label="保存"
             onPress={() =>
               onSave({
                 sniffer: {
@@ -104,7 +107,7 @@ const Sniffer: React.FC = () => {
             data-color="primary"
             className="app-nodrag"
           >
-            保存
+            <FiSave className="text-lg" />
           </Button>
         )
       }

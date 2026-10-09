@@ -3,6 +3,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 
 class Target(BaseHTTPRequestHandler):
+ def do_HEAD(self):
+  self.send_response(200); self.end_headers()
  def do_GET(self):
   self.send_response(200); self.end_headers()
   try:
@@ -31,6 +33,9 @@ with sync_playwright() as p:
  assert runtime['mixed-port']==17893 and not runtime.get('tun',{}).get('enable',False)
  assert 'LocalRules' in runtime.get('rule-providers',{}) and not config['sysProxy']['enable']
  errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
+ latency=page.evaluate('()=>window.electron.ipcRenderer.invoke("getNetworkLatencies",[{name:"Local fixture",url:"http://127.0.0.1:18081/"}])')
+ assert isinstance(latency['Local fixture'],(int,float)) and latency['Local fixture']>0,latency
+ print('PASS: custom latency URL through Electron network stack',latency,flush=True)
  if page.locator('.driver-popover-close-btn').count(): page.locator('.driver-popover-close-btn').click()
  page.evaluate("location.hash='/home'")
  page.get_by_text('网络拓扑',exact=True).wait_for()

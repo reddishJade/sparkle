@@ -1,3 +1,8 @@
+import {
+  latencyTargets,
+  validateNetworkTargets,
+  type NetworkTarget
+} from '../../shared/network-targets'
 import { net } from 'electron'
 import { performance } from 'node:perf_hooks'
 // Fixed provider list follows metacubexd. Requests use Electron's network stack and OS proxy.
@@ -25,15 +30,13 @@ export async function getNetworkInfo(
     org: data.asn_organization ?? data.connection?.org ?? data.asn?.org ?? ''
   }
 }
-export async function getNetworkLatencies(): Promise<Record<string, number | null>> {
-  const targets = [
-    ['Google', 'https://www.google.com/generate_204'],
-    ['Cloudflare', 'https://cp.cloudflare.com/generate_204'],
-    ['GitHub', 'https://github.com']
-  ]
+export async function getNetworkLatencies(
+  input: NetworkTarget[] = latencyTargets
+): Promise<Record<string, number | null>> {
+  const targets = validateNetworkTargets(input)
   return Object.fromEntries(
     await Promise.all(
-      targets.map(async ([name, url]) => {
+      targets.map(async ({ name, url }) => {
         const start = performance.now()
         try {
           const response = await net.fetch(url, {

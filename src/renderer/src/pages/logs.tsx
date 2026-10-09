@@ -7,7 +7,7 @@ import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso } from 'react-virtuoso'
-import { IoLocationSharp } from 'react-icons/io5'
+import { IoLocationSharp, IoPause, IoPlay } from 'react-icons/io5'
 import { CgTrash } from 'react-icons/cg'
 
 import { includesIgnoreCase } from '@renderer/utils/includes'
@@ -62,6 +62,8 @@ const Logs: React.FC = () => {
   const [logs, setLogs] = useState<MihomoLogEntry[]>(() => getMihomoLogs())
   const [filter, setFilter] = useState('')
   const [trace, setTrace] = useState(true)
+  const [paused, setPaused] = useState(false)
+  const pausedRef = useRef(false)
   const [freshLogIds, setFreshLogIds] = useState<string[]>([])
 
   const freshLogTimerRef = useRef<number | null>(null)
@@ -88,8 +90,11 @@ const Logs: React.FC = () => {
 
   useEffect(() => {
     return subscribeMihomoLogs((nextLogs) => {
+      if (pausedRef.current) return
       startTransition(() => {
-        setLogs((prevLogs) => (areSameLogEntries(prevLogs, nextLogs) ? prevLogs : nextLogs))
+        setLogs((prevLogs) =>
+          pausedRef.current || areSameLogEntries(prevLogs, nextLogs) ? prevLogs : nextLogs
+        )
       })
     })
   }, [])
@@ -254,11 +259,30 @@ const Logs: React.FC = () => {
             <Button
               size="sm"
               isIconOnly
+              aria-label={paused ? '继续日志' : '暂停日志'}
+              aria-pressed={paused}
+              variant={paused ? 'primary' : 'ghost'}
+              onPress={() => {
+                const next = !pausedRef.current
+                pausedRef.current = next
+                setPaused(next)
+                clearFreshLogTimer()
+                setFreshLogIds([])
+                if (!next) setLogs(getMihomoLogs())
+              }}
+            >
+              {paused ? <IoPlay className="text-lg" /> : <IoPause className="text-lg" />}
+            </Button>
+            <Button
+              size="sm"
+              isIconOnly
               onPress={() => {
                 clearMihomoLogs()
+                setLogs([])
               }}
               variant="ghost"
               data-color="danger"
+              aria-label="清空日志"
             >
               <CgTrash className="text-lg" />
             </Button>
@@ -270,13 +294,13 @@ const Logs: React.FC = () => {
             className="h-full pr-1"
             data={filteredLogs}
             initialTopMostItemIndex={filteredLogs.length > 0 ? filteredLogs.length - 1 : undefined}
-            followOutput={trace}
+            followOutput={trace && !paused}
             computeItemKey={(_index, log) => log.id}
             itemContent={(i, log) => {
               return (
                 <LogItem
                   index={i}
-                  animateOnMount={freshLogIdSet.has(log.id)}
+                  animateOnMount={!paused && freshLogIdSet.has(log.id)}
                   time={log.time}
                   type={log.type}
                   payload={log.payload}

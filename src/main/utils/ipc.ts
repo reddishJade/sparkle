@@ -420,7 +420,9 @@ export function registerIpcMainHandlers(): void {
   ipcMain.handle('getNetworkInfo', (_e, provider) =>
     ipcErrorWrapper(() => getNetworkInfo(provider))()
   )
-  ipcMain.handle('getNetworkLatencies', () => ipcErrorWrapper(getNetworkLatencies)())
+  ipcMain.handle('getNetworkLatencies', (_e, targets) =>
+    ipcErrorWrapper(() => getNetworkLatencies(targets))()
+  )
   ipcMain.handle('getUsage', (_e, query) =>
     ipcErrorWrapper(() => trafficStatsService.getUsage(query))()
   )

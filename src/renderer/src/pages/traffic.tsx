@@ -10,6 +10,9 @@ import { calcTraffic } from '@renderer/utils/calc'
 import { clearTrafficStats, getUsage, setUsageRetention } from '@renderer/utils/ipc'
 import { notify } from '@renderer/utils/notification'
 import {
+  FiRefreshCw,
+  FiDownload,
+  FiTrash2,
   FiArrowUp,
   FiArrowDown,
   FiLayers,
@@ -162,11 +165,19 @@ export default function UsagePage() {
       title="用量"
       header={
         <div className="flex gap-1 app-nodrag">
-          <Button size="sm" variant="ghost" onPress={() => void refresh()}>
-            刷新
+          <Button
+            size="sm"
+            isIconOnly
+            aria-label="刷新用量"
+            variant="ghost"
+            onPress={() => void refresh()}
+          >
+            <FiRefreshCw className="text-lg" />
           </Button>
           <Button
             size="sm"
+            isIconOnly
+            aria-label="导出用量"
             variant="ghost"
             onPress={() =>
               downloadText(
@@ -181,10 +192,16 @@ export default function UsagePage() {
               )
             }
           >
-            导出
+            <FiDownload className="text-lg" />
           </Button>
-          <Button size="sm" variant="ghost" onPress={() => setClearOpen(true)}>
-            清空
+          <Button
+            size="sm"
+            isIconOnly
+            aria-label="清空用量"
+            variant="ghost"
+            onPress={() => setClearOpen(true)}
+          >
+            <FiTrash2 className="text-lg" />
           </Button>
         </div>
       }

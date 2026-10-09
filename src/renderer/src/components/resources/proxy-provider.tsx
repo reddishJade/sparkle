@@ -1,16 +1,14 @@
-import { Button, Chip, Separator, Meter } from '@heroui/react'
+import { Button, Chip, Card, Meter } from '@heroui/react'
 
 import {
   mihomoProxyProviders,
   mihomoUpdateProxyProviders,
   getRuntimeConfig
 } from '@renderer/utils/ipc'
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Viewer from './viewer'
 import ProviderNodes from './provider-nodes'
 import useSWR from 'swr'
-import SettingCard from '../base/base-setting-card'
-import SettingItem from '../base/base-setting-item'
 import { IoMdRefresh } from 'react-icons/io'
 import { CgLoadbarDoc } from 'react-icons/cg'
 import { MdEditDocument, MdQrCode2 } from 'react-icons/md'
@@ -140,7 +138,7 @@ const ProxyProvider: React.FC = () => {
   }
 
   return (
-    <SettingCard>
+    <div className="provider-workspace">
       {qrCode && (
         <QRCodeModal title={qrCode.name} url={qrCode.url} onClose={() => setQrCode(null)} />
       )}
@@ -163,126 +161,115 @@ const ProxyProvider: React.FC = () => {
           }
         />
       )}
-      <SettingItem compatKey="legacy" title="代理集合" divider>
+      <div className="provider-page-toolbar">
+        <span>{providers.length} 个代理提供者</span>
         <Button
           size="sm"
-          onPress={() => {
-            providers.forEach((provider, index) => {
-              onUpdate(provider.name, index)
-            })
-          }}
+          isIconOnly
+          aria-label="更新全部代理提供者"
           variant="primary"
-          data-color="primary"
+          onPress={() =>
+            providers.forEach((provider, index) => {
+              void onUpdate(provider.name, index)
+            })
+          }
         >
-          更新全部
+          <IoMdRefresh className="text-lg" />
         </Button>
-      </SettingItem>
-      {providers.map((provider, index) => (
-        <Fragment key={provider.name}>
-          <SettingItem
-            compatKey="legacy"
-            title={provider.name}
-            actions={
-              <Chip
-                size="sm"
-                data-color="default"
-                variant="primary"
-                className={['ml-2'].filter(Boolean).join(' ')}
-              >
-                <Chip.Label>{provider.proxies?.length || 0}</Chip.Label>
-              </Chip>
-            }
-            divider={!provider.subscriptionInfo && index !== providers.length - 1}
-          >
-            <div className="flex h-8 leading-8 text-foreground-500">
-              <div>{dayjs(provider.updatedAt).fromNow()}</div>
-              {provider.vehicleType === 'HTTP' && (
-                <Button
-                  isIconOnly
-                  size="sm"
-                  onPress={() => onShowQrCode(provider.name)}
-                  variant="primary"
-                  data-color="default"
-                  className="ml-2"
-                >
-                  <MdQrCode2 className="text-lg" />
-                </Button>
-              )}
-              <Button
-                isIconOnly
-                size="sm"
-                onPress={() => {
-                  setShowDetails({
-                    show: false,
-                    providerType: 'proxy-providers',
-                    path: provider.name,
-                    type: provider.vehicleType,
-                    title: provider.name,
-                    ageSecretKey: ''
-                  })
-                }}
-                variant="primary"
-                data-color="default"
-                className="ml-2"
-              >
-                {provider.vehicleType == 'File' ? (
-                  <MdEditDocument className={`text-lg`} />
-                ) : (
-                  <CgLoadbarDoc className={`text-lg`} />
-                )}
-              </Button>
-              <Button
-                isIconOnly
-                size="sm"
-                onPress={() => {
-                  onUpdate(provider.name, index)
-                }}
-                variant="primary"
-                data-color="default"
-                className="ml-2"
-              >
-                <IoMdRefresh className={`text-lg ${updating[index] ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
-          </SettingItem>
-          {provider.subscriptionInfo && (
-            <>
-              <SettingItem
-                compatKey="legacy"
-                title={
-                  <div className="text-foreground-500">
-                    {`${calcTraffic(provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download)} / ${calcTraffic(provider.subscriptionInfo.Total)}`}
-                  </div>
-                }
-              >
-                <div className="h-8 leading-8 text-foreground-500">
-                  {provider.subscriptionInfo.Expire
-                    ? dayjs.unix(provider.subscriptionInfo.Expire).format('YYYY-MM-DD')
-                    : '长期有效'}
+      </div>
+      <div className="provider-grid">
+        {providers.map((provider, index) => (
+          <Card key={provider.name} className="provider-card">
+            <Card.Content>
+              <div className="provider-card-heading">
+                <div className="flex items-center min-w-0 gap-2">
+                  <h2 className="truncate font-semibold" title={provider.name}>
+                    {provider.name}
+                  </h2>
+                  <Chip size="sm" variant="soft">
+                    <Chip.Label>{provider.proxies?.length ?? 0}</Chip.Label>
+                  </Chip>
                 </div>
-              </SettingItem>
-              <Meter
-                aria-label={`${provider.name} 流量使用`}
-                className="w-full"
-                maxValue={provider.subscriptionInfo.Total}
-                value={provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download}
-              >
-                <Meter.Track>
-                  <Meter.Fill />
-                </Meter.Track>
-              </Meter>
-              {index !== providers.length - 1 && <Separator className="my-2" />}
-            </>
-          )}
-          <ProviderNodes
-            provider={provider}
-            refresh={() => {
-              void mutate()
-            }}
-          />
-        </Fragment>
-      ))}
-    </SettingCard>
+                <div className="flex gap-1 shrink-0">
+                  {provider.vehicleType === 'HTTP' && (
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`${provider.name} 二维码`}
+                      onPress={() => void onShowQrCode(provider.name)}
+                    >
+                      <MdQrCode2 />
+                    </Button>
+                  )}
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${provider.name} 查看文件`}
+                    onPress={() =>
+                      setShowDetails({
+                        show: false,
+                        providerType: 'proxy-providers',
+                        path: provider.name,
+                        type: provider.vehicleType,
+                        title: provider.name,
+                        ageSecretKey: ''
+                      })
+                    }
+                  >
+                    {provider.vehicleType === 'File' ? <MdEditDocument /> : <CgLoadbarDoc />}
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`${provider.name} 更新`}
+                    isDisabled={updating[index]}
+                    onPress={() => void onUpdate(provider.name, index)}
+                  >
+                    <IoMdRefresh className={updating[index] ? 'animate-spin' : ''} />
+                  </Button>
+                </div>
+              </div>
+              <div className="provider-updated">更新于 {dayjs(provider.updatedAt).fromNow()}</div>
+              {provider.subscriptionInfo && (
+                <div className="provider-subscription">
+                  <div className="flex justify-between gap-2 text-xs text-foreground-500">
+                    <span>
+                      {calcTraffic(
+                        provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download
+                      )}{' '}
+                      / {calcTraffic(provider.subscriptionInfo.Total)}
+                    </span>
+                    <span>
+                      {provider.subscriptionInfo.Expire
+                        ? `${dayjs.unix(provider.subscriptionInfo.Expire).format('YYYY-MM-DD')} 到期`
+                        : '长期有效'}
+                    </span>
+                  </div>
+                  <Meter
+                    aria-label={`${provider.name} 流量使用`}
+                    maxValue={Math.max(1, provider.subscriptionInfo.Total)}
+                    value={provider.subscriptionInfo.Upload + provider.subscriptionInfo.Download}
+                  >
+                    <Meter.Track>
+                      <Meter.Fill />
+                    </Meter.Track>
+                  </Meter>
+                </div>
+              )}
+              <ProviderNodes
+                provider={provider}
+                refresh={() => {
+                  void mutate()
+                }}
+              />
+            </Card.Content>
+          </Card>
+        ))}
+      </div>
+    </div>
   )
 }
 

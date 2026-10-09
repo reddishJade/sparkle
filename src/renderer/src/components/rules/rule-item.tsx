@@ -13,12 +13,11 @@ dayjs.extend(relativeTime)
 dayjs.locale('zh-cn')
 
 interface Props {
-  index: number
   rule: ControllerRulesDetail
   totalHitCount?: number
 }
 
-const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
+const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0 }) => {
   const { mutate } = useRules()
   const [isEnabled, setIsEnabled] = useState(!rule.extra.disabled)
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -26,10 +25,8 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
   const [showTooltip, setShowTooltip] = useState(false)
 
   const { hitCount } = rule.extra
-
-  const hasStats = Boolean(hitCount > 0 && totalHitCount > 0)
-  const hitRatio = hasStats ? (hitCount / totalHitCount) * 100 : 0
-  const hitRatioText = hitRatio >= 0.1 ? `${hitRatio.toFixed(1)}%` : hitRatio > 0 ? '<0.1%' : '0%'
+  const hitRatio = totalHitCount > 0 ? (hitCount / totalHitCount) * 100 : 0
+  const hitRatioText = hitRatio >= 0.1 ? `${hitRatio.toFixed(1)}%` : '<0.1%'
 
   useEffect(() => {
     setIsEnabled(!rule.extra.disabled)
@@ -76,29 +73,40 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
   }
 
   return (
-    <div className={`w-full px-2 pb-2 ${index === 0 ? 'pt-2' : ''}`}>
-      <Card>
+    <div className="rule-grid-card">
+      <Card className="h-full">
         <Card.Content className="w-full">
-          <div className="truncate font-semibold mb-2" title={rule.payload || 'Match'}>
-            {rule.payload || 'Match'}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs text-foreground-500">{rule.index + 1}</span>
+            <div className="truncate font-semibold" title={rule.payload || 'Match'}>
+              {rule.payload || 'Match'}
+            </div>
+            <div className="ml-auto shrink-0">
+              <Switch size="sm" isSelected={isEnabled} onChange={handleToggle} aria-label="启用">
+                <Switch.Content>
+                  <Switch.Control>
+                    <Switch.Thumb />
+                  </Switch.Control>
+                </Switch.Content>
+              </Switch>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Switch size="sm" isSelected={isEnabled} onChange={handleToggle} aria-label="启用">
-              <Switch.Content>
-                <Switch.Control>
-                  <Switch.Thumb />
-                </Switch.Control>
-              </Switch.Content>
-            </Switch>
+          <div className="rule-mainline flex items-center gap-2 text-xs">
             <Chip size="sm" data-color="primary" variant="soft">
               <Chip.Label>{rule.type}</Chip.Label>
             </Chip>
             <span className="text-foreground-500">→</span>
-            <Chip size="sm" data-color="secondary" variant="soft">
-              <Chip.Label>{rule.proxy}</Chip.Label>
+            <Chip
+              size="sm"
+              data-color="secondary"
+              variant="soft"
+              className="min-w-0"
+              title={rule.proxy}
+            >
+              <Chip.Label className="truncate">{rule.proxy}</Chip.Label>
             </Chip>
             <div
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 shrink-0 ml-auto"
               ref={wrapperRef}
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
@@ -109,8 +117,9 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
               <Chip size="sm" data-color="warning" variant="soft">
                 <Chip.Label>{rule.extra.missCount ?? 0}</Chip.Label>
               </Chip>
-              {hasStats && <span className="text-foreground-500">{hitRatioText}</span>}
             </div>
+          </div>
+          <div className="rule-times text-xs text-foreground-500">
             {rule.extra.hitAt && Date.parse(rule.extra.hitAt) > 0 && (
               <span className="text-foreground-500">
                 最近命中 {dayjs(rule.extra.hitAt).fromNow()}
@@ -119,6 +128,11 @@ const RuleItem: React.FC<Props> = ({ rule, index, totalHitCount = 0 }) => {
             {rule.extra.missAt && Date.parse(rule.extra.missAt) > 0 && (
               <span className="text-foreground-500">
                 最近未命中 {dayjs(rule.extra.missAt).fromNow()}
+              </span>
+            )}
+            {hitCount > 0 && totalHitCount > 0 && (
+              <span className="ml-auto shrink-0" title="占全部规则命中的比例">
+                {hitRatioText}
               </span>
             )}
           </div>

@@ -13,8 +13,6 @@ const titleMap = {
   connectionCardStatus: '连接',
   trafficCardStatus: '用量',
   mihomoCoreCardStatus: '内核',
-  dnsCardStatus: 'DNS',
-  sniffCardStatus: '域名嗅探',
   logCardStatus: '日志'
 }
 const SiderConfig: React.FC = () => {
@@ -29,8 +27,6 @@ const SiderConfig: React.FC = () => {
     connectionCardStatus = 'col-span-2',
     trafficCardStatus = 'col-span-2',
     mihomoCoreCardStatus = 'col-span-2',
-    dnsCardStatus = 'col-span-1',
-    sniffCardStatus = 'col-span-1',
     logCardStatus = 'col-span-1'
   } = appConfig || {}
 
@@ -44,8 +40,6 @@ const SiderConfig: React.FC = () => {
     connectionCardStatus,
     trafficCardStatus,
     mihomoCoreCardStatus,
-    dnsCardStatus,
-    sniffCardStatus,
     logCardStatus
   }
 

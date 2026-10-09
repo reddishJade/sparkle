@@ -1,4 +1,6 @@
 import { Button, InputGroup } from '@heroui/react'
+import DashboardSelect from '@renderer/components/base/dashboard-select'
+import { MdOutlineSpeed } from 'react-icons/md'
 import { useState } from 'react'
 import { mihomoProxyDelay } from '@renderer/utils/ipc'
 import { runDelayTestsWithConcurrency } from '@renderer/utils/delay-test'
@@ -45,13 +47,13 @@ export default function ProviderNodes({
     }
   }
   return (
-    <div className="px-3 pb-3">
+    <div className="provider-nodes">
       <div className="flex gap-2">
         <Button size="sm" variant="ghost" aria-expanded={open} onPress={() => setOpen(!open)}>
           {open ? '收起节点' : `查看节点 (${provider.proxies?.length ?? 0})`}
         </Button>
         <Button size="sm" variant="ghost" isDisabled={testing} onPress={() => void test(nodes)}>
-          {testing ? '测试中…' : '健康检查'}
+          {testing ? '测试中…' : '延迟测试'}
         </Button>
       </div>
       {open && (
@@ -68,55 +70,60 @@ export default function ProviderNodes({
                 }}
               />
             </InputGroup>
-            <select
-              className="dashboard-select"
-              aria-label="集合节点排序"
+            <DashboardSelect
+              label="集合节点排序"
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
-            >
-              <option value="default">原始顺序</option>
-              <option value="name">名称</option>
-              <option value="delay">延迟</option>
-            </select>
+              options={[
+                ['default', '原始顺序'],
+                ['name', '名称'],
+                ['delay', '延迟']
+              ]}
+              onChange={setSort}
+              className="w-28"
+            />
           </div>
-          <div className="overflow-auto">
-            <table className="data-table">
+          <div className="provider-node-list">
+            <table className="provider-node-table">
               <thead>
                 <tr>
                   <th>节点</th>
                   <th>类型</th>
-                  <th>UDP</th>
                   <th>延迟</th>
-                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {nodes.slice(0, limit).map((proxy) => (
                   <tr key={proxy.name}>
-                    <td title={proxy.name}>{proxy.name}</td>
-                    <td>{proxy.type}</td>
-                    <td>{proxy.udp ? '支持' : '—'}</td>
+                    <td title={proxy.name}>
+                      <span className="block truncate">{proxy.name}</span>
+                    </td>
                     <td>
-                      {latency(proxy) > 0
-                        ? `${latency(proxy)} ms`
-                        : latency(proxy) === 0
-                          ? '超时'
-                          : '未测试'}
+                      <span>{proxy.type}</span>
+                      <span className="provider-udp">{proxy.udp ? 'UDP' : ''}</span>
                     </td>
                     <td>
                       <Button
                         size="sm"
                         variant="ghost"
+                        aria-label={`${proxy.name} 延迟测试`}
                         isDisabled={testing}
                         onPress={() => void test([proxy])}
                       >
-                        测速
+                        <span className="tabular-nums">
+                          {latency(proxy) > 0
+                            ? `${latency(proxy)} ms`
+                            : latency(proxy) === 0
+                              ? '超时'
+                              : '未测试'}
+                        </span>
+                        <MdOutlineSpeed />
                       </Button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            {!nodes.length && <p className="dashboard-empty">没有匹配的节点</p>}
           </div>
           {nodes.length > limit && (
             <Button size="sm" variant="ghost" onPress={() => setLimit(limit + 50)}>

@@ -1,3 +1,4 @@
+import type { NetworkTarget } from '../../../shared/network-targets'
 import { TitleBarOverlayOptions } from 'electron'
 import type { TrafficStatsSummary, TrafficTimeRange } from '../../../shared/types/traffic'
 
@@ -629,6 +630,8 @@ export async function getNetworkInfo(
 ): Promise<{ address: string; location: string; org: string }> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkInfo', provider))
 }
-export async function getNetworkLatencies(): Promise<Record<string, number | null>> {
-  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkLatencies'))
+export async function getNetworkLatencies(
+  targets?: NetworkTarget[]
+): Promise<Record<string, number | null>> {
+  return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkLatencies', targets))
 }

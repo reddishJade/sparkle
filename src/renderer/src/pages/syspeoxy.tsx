@@ -1,3 +1,4 @@
+import { FiSave } from 'react-icons/fi'
 import { Button, Input, Tooltip, Switch, Tabs } from '@heroui/react'
 
 import BasePage from '@renderer/components/base/base-page'
@@ -151,12 +152,14 @@ const Sysproxy: React.FC = () => {
         changed && (
           <Button
             size="sm"
+            isIconOnly
+            aria-label="保存"
             onPress={onSave}
             variant="primary"
             data-color="primary"
             className="app-nodrag"
           >
-            保存
+            <FiSave className="text-lg" />
           </Button>
         )
       }

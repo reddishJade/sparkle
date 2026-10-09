@@ -1,3 +1,4 @@
+import { FiSave } from 'react-icons/fi'
 import { Button, Input, Tooltip, Switch, Tabs } from '@heroui/react'
 
 import BasePage from '@renderer/components/base/base-page'
@@ -115,6 +116,8 @@ const DNS: React.FC = () => {
         changed && (
           <Button
             size="sm"
+            isIconOnly
+            aria-label="保存"
             onPress={() => {
               const hostsObject =
                 values.useHosts && values.hosts && values.hosts.length > 0
@@ -153,7 +156,7 @@ const DNS: React.FC = () => {
                 : hasDnsErrors
             }
           >
-            保存
+            <FiSave className="text-lg" />
           </Button>
         )
       }
