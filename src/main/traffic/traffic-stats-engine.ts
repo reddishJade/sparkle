@@ -39,6 +39,17 @@ export function extractProcessName(process?: string, processPath?: string): stri
   return ''
 }
 
+export function formatRuleName(rule?: string, rulePayload?: string): string {
+  const r = rule?.trim() || ''
+  const p = rulePayload?.trim() || ''
+  if (!r && !p) return '其他'
+  if (r && p) {
+    if (r.includes(p)) return r
+    return `${r}(${p})`
+  }
+  return r || p
+}
+
 interface ActiveConnectionState {
   upload: number
   download: number
@@ -53,6 +64,7 @@ interface ActiveConnectionState {
   process: string
   processPath?: string
   rule?: string
+  rulePayload?: string
   start?: string
 }
 
@@ -75,7 +87,8 @@ export class TrafficStatsEngine {
       records: {},
       connections: {},
       processes: {},
-      hosts: {}
+      hosts: {},
+      rules: {}
     }
   }
   private activeConns = new Map<string, ActiveConnectionState>()
@@ -120,6 +133,7 @@ export class TrafficStatsEngine {
     if (!dayStats.connections) dayStats.connections = {}
     if (!dayStats.processes) dayStats.processes = {}
     if (!dayStats.hosts) dayStats.hosts = {}
+    if (!dayStats.rules) dayStats.rules = {}
     if (dayStats.attributedUpload === undefined || dayStats.attributedDownload === undefined) {
       let sumUp = 0
       let sumDown = 0
@@ -173,7 +187,8 @@ export class TrafficStatsEngine {
         records: {},
         connections: {},
         processes: {},
-        hosts: {}
+        hosts: {},
+        rules: {}
       }
       this.dirty = true
     } else {
@@ -306,6 +321,7 @@ export class TrafficStatsEngine {
         const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
         const network = conn.metadata?.network || 'tcp'
         const rule = conn.rule || ''
+        const rulePayload = conn.rulePayload || ''
         const start = conn.start
         this.activeConns.set(conn.id, {
           upload: Math.max(0, conn.upload),
@@ -321,6 +337,7 @@ export class TrafficStatsEngine {
           process,
           processPath: conn.metadata?.processPath,
           rule,
+          rulePayload,
           start
         })
       }
@@ -363,6 +380,7 @@ export class TrafficStatsEngine {
         const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
         const network = conn.metadata?.network || 'tcp'
         const rule = conn.rule || ''
+        const rulePayload = conn.rulePayload || ''
         const start = conn.start
         this.activeConns.set(conn.id, {
           upload: Math.max(0, conn.upload),
@@ -378,6 +396,7 @@ export class TrafficStatsEngine {
           process,
           processPath: conn.metadata?.processPath,
           rule,
+          rulePayload,
           start
         })
       }
@@ -414,6 +433,8 @@ export class TrafficStatsEngine {
       const process = extractProcessName(conn.metadata?.process, conn.metadata?.processPath)
       const network = conn.metadata?.network || 'tcp'
       const rule = conn.rule || ''
+      const rulePayload = conn.rulePayload || ''
+      const fullRule = formatRuleName(rule, rulePayload)
       const start = conn.start
 
       let connUpDelta: number
@@ -436,6 +457,7 @@ export class TrafficStatsEngine {
         prev.process = process
         prev.processPath = conn.metadata?.processPath
         prev.rule = rule
+        prev.rulePayload = rulePayload
         prev.start = start
       } else {
         // 新连接首次出现
@@ -455,6 +477,7 @@ export class TrafficStatsEngine {
           process,
           processPath: conn.metadata?.processPath,
           rule,
+          rulePayload,
           start
         })
       }
@@ -509,6 +532,7 @@ export class TrafficStatsEngine {
             group,
             chains,
             rule,
+            rulePayload,
             upload: 0,
             download: 0,
             total: 0,
@@ -537,6 +561,7 @@ export class TrafficStatsEngine {
             group,
             chains,
             rule,
+            rulePayload,
             upload: 0,
             download: 0,
             total: 0,
@@ -573,6 +598,18 @@ export class TrafficStatsEngine {
         if (!this.sessionStats.hosts[hostKey]) this.sessionStats.hosts[hostKey] = { upload: 0, download: 0 }
         this.sessionStats.hosts[hostKey].upload += connUpDelta
         this.sessionStats.hosts[hostKey].download += connDownDelta
+
+        // 5. 分流规则维度聚合
+        const ruleKey = fullRule
+        if (!dayStats.rules) dayStats.rules = {}
+        if (!dayStats.rules[ruleKey]) dayStats.rules[ruleKey] = { upload: 0, download: 0 }
+        dayStats.rules[ruleKey].upload += connUpDelta
+        dayStats.rules[ruleKey].download += connDownDelta
+
+        if (!this.sessionStats.rules) this.sessionStats.rules = {}
+        if (!this.sessionStats.rules[ruleKey]) this.sessionStats.rules[ruleKey] = { upload: 0, download: 0 }
+        this.sessionStats.rules[ruleKey].upload += connUpDelta
+        this.sessionStats.rules[ruleKey].download += connDownDelta
 
         this.dirty = true
       }
@@ -649,6 +686,7 @@ export class TrafficStatsEngine {
 
     const nodeMap = new Map<string, { upload: number; download: number }>()
     const groupMap = new Map<string, { upload: number; download: number }>()
+    const ruleMap = new Map<string, { upload: number; download: number }>()
     const procMap = new Map<string, { upload: number; download: number }>()
     const hostMap = new Map<string, { upload: number; download: number }>()
     const connMap = new Map<string, TrafficConnectionItem>()
@@ -674,6 +712,19 @@ export class TrafficStatsEngine {
           existingGroup.download += record.download
         } else {
           groupMap.set(record.group, { upload: record.upload, download: record.download })
+        }
+      }
+
+      // 规则统计
+      if (dayStats.rules) {
+        for (const [name, stats] of Object.entries(dayStats.rules)) {
+          const existing = ruleMap.get(name)
+          if (existing) {
+            existing.upload += stats.upload
+            existing.download += stats.download
+          } else {
+            ruleMap.set(name, { upload: stats.upload, download: stats.download })
+          }
         }
       }
 
@@ -745,6 +796,16 @@ export class TrafficStatsEngine {
       })
     }
 
+    const rules: TrafficSummaryItem[] = []
+    for (const [name, stats] of ruleMap.entries()) {
+      rules.push({
+        name,
+        upload: stats.upload,
+        download: stats.download,
+        total: stats.upload + stats.download
+      })
+    }
+
     const processes: TrafficSummaryItem[] = []
     for (const [name, stats] of procMap.entries()) {
       processes.push({
@@ -770,6 +831,7 @@ export class TrafficStatsEngine {
     // 默认按 Total 降序排序
     nodes.sort((a, b) => b.total - a.total)
     groups.sort((a, b) => b.total - a.total)
+    rules.sort((a, b) => b.total - a.total)
     processes.sort((a, b) => b.total - a.total)
     hosts.sort((a, b) => b.total - a.total)
     connections.sort((a, b) => b.total - a.total)
@@ -792,6 +854,7 @@ export class TrafficStatsEngine {
       unknownTotal,
       nodes,
       groups,
+      rules,
       connections: trimmedConnections,
       processes,
       hosts,

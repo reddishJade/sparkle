@@ -1205,6 +1205,112 @@ describe('TrafficStatsEngine', () => {
     assert.equal(summary.connections.length, 0)
     assert.equal(summary.processes.length, 0)
     assert.equal(summary.hosts.length, 0)
+    assert.equal(summary.rules.length, 0)
+  })
+
+  // 24. 分流规则（rules）维度聚合统计与清空重置
+  it('24. 分流规则（rules）维度聚合统计与清空重置', () => {
+    const engine = new TrafficStatsEngine()
+    engine.feedSnapshot(
+      {
+        uploadTotal: 100,
+        downloadTotal: 100,
+        connections: [
+          {
+            id: 'c1',
+            upload: 10,
+            download: 10,
+            chains: ['Node1', 'Group1'],
+            rule: 'DomainSuffix',
+            rulePayload: 'google.com',
+            metadata: { host: 'google.com' }
+          } as any,
+          {
+            id: 'c2',
+            upload: 10,
+            download: 10,
+            chains: ['Node1', 'Group1'],
+            rule: 'DomainSuffix',
+            rulePayload: 'google.com',
+            metadata: { host: 'youtube.com' }
+          } as any,
+          {
+            id: 'c3',
+            upload: 10,
+            download: 10,
+            chains: ['Node2', 'Group1'],
+            rule: 'Match',
+            rulePayload: '',
+            metadata: { host: 'other.org' }
+          } as any
+        ]
+      },
+      baseTime
+    )
+
+    // c1 增量 40/60, c2 增量 20/30, c3 增量 10/20
+    engine.feedSnapshot(
+      {
+        uploadTotal: 170,
+        downloadTotal: 210,
+        connections: [
+          {
+            id: 'c1',
+            upload: 50, // +40
+            download: 70, // +60
+            chains: ['Node1', 'Group1'],
+            rule: 'DomainSuffix',
+            rulePayload: 'google.com',
+            metadata: { host: 'google.com' }
+          } as any,
+          {
+            id: 'c2',
+            upload: 30, // +20
+            download: 40, // +30
+            chains: ['Node1', 'Group1'],
+            rule: 'DomainSuffix',
+            rulePayload: 'google.com',
+            metadata: { host: 'youtube.com' }
+          } as any,
+          {
+            id: 'c3',
+            upload: 20, // +10
+            download: 30, // +20
+            chains: ['Node2', 'Group1'],
+            rule: 'Match',
+            rulePayload: '',
+            metadata: { host: 'other.org' }
+          } as any
+        ]
+      },
+      baseTime + 1000
+    )
+
+    const summary = engine.getSummary('today', baseTime + 1000)
+    assert.equal(summary.rules.length, 2)
+
+    // DomainSuffix(google.com) total = (40+20) + (60+30) = 60 + 90 = 150
+    const rule1 = summary.rules.find((r) => r.name === 'DomainSuffix(google.com)')!
+    assert.ok(rule1)
+    assert.equal(rule1.upload, 60)
+    assert.equal(rule1.download, 90)
+    assert.equal(rule1.total, 150)
+
+    // Match total = 10 + 20 = 30
+    const rule2 = summary.rules.find((r) => r.name === 'Match')!
+    assert.ok(rule2)
+    assert.equal(rule2.upload, 10)
+    assert.equal(rule2.download, 20)
+    assert.equal(rule2.total, 30)
+
+    // 默认按 Total 降序
+    assert.equal(summary.rules[0].name, 'DomainSuffix(google.com)')
+    assert.equal(summary.rules[1].name, 'Match')
+
+    // 清空重置
+    engine.clear(baseTime + 2000)
+    const afterClear = engine.getSummary('today', baseTime + 2000)
+    assert.equal(afterClear.rules.length, 0)
   })
 })
 
