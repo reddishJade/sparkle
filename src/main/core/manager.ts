@@ -207,6 +207,7 @@ type ServiceCoreConnectionProbe = {
 }
 
 async function startMihomoApiStreams(): Promise<void> {
+  mainWindow?.webContents.send('core-started')
   await startMihomoTraffic()
   await startMihomoConnections()
   await startMihomoLogs()
@@ -668,6 +669,7 @@ export async function stopCore(force = false): Promise<void> {
     }
     await rm(path.join(dataDir(), 'core.pid')).catch(() => {})
   }
+  mainWindow?.webContents.send('core-stopped')
 }
 
 function notifyCoreLog(source: CoreLogNotificationSource): void {

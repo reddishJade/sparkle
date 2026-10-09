@@ -78,9 +78,25 @@ export function initializeLiveData(): void {
       connected: true
     })
   })
-  window.electron.ipcRenderer.on('core-stopped', () =>
-    publish({ connected: false, traffic: { up: 0, down: 0 } })
-  )
+  window.electron.ipcRenderer.on('core-stopped', () => {
+    archived = [
+      ...archived,
+      ...[...previous.values()].map((connection) => ({
+        ...connection,
+        isActive: false,
+        uploadSpeed: 0,
+        downloadSpeed: 0
+      }))
+    ].slice(-1000)
+    previous.clear()
+    previousTime = 0
+    publish({
+      connected: false,
+      traffic: { up: 0, down: 0 },
+      memory: 0,
+      connections: { uploadTotal: 0, downloadTotal: 0, memory: 0, connections: [] }
+    })
+  })
   window.electron.ipcRenderer.on('core-started', () => {
     previous.clear()
     previousTime = 0
@@ -88,6 +104,7 @@ export function initializeLiveData(): void {
       traffic: { up: 0, down: 0 },
       connections: { uploadTotal: 0, downloadTotal: 0, memory: 0, connections: [] },
       history: [],
+      memory: 0,
       connected: false
     })
   })

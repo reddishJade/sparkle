@@ -1,7 +1,7 @@
 // Network probes adapted from metacubexd; see licenses/metacubexd-MIT.txt.
 import { getNetworkInfo, getNetworkLatencies } from '@renderer/utils/ipc'
 import { Button } from '@heroui/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 const providers = {
   'ip.sb': 'https://api.ip.sb/geoip',
   'ipwho.is': 'https://ipwho.is/',
@@ -19,16 +19,19 @@ export default function NetworkInfo() {
   const [loading, setLoading] = useState(false)
   const [latencies, setLatencies] = useState<Record<string, number | null>>({})
   const [testing, setTesting] = useState(false)
+  const requestId = useRef(0)
   async function fetchIP(selected = provider): Promise<void> {
+    const id = ++requestId.current
     setLoading(true)
     setIpError('')
     setIp(undefined)
     try {
-      setIp(await getNetworkInfo(selected))
+      const result = await getNetworkInfo(selected)
+      if (id === requestId.current) setIp(result)
     } catch (error) {
-      setIpError(`查询失败：${String(error)}`)
+      if (id === requestId.current) setIpError(`查询失败：${String(error)}`)
     } finally {
-      setLoading(false)
+      if (id === requestId.current) setLoading(false)
     }
   }
   async function test(): Promise<void> {
@@ -43,6 +46,9 @@ export default function NetworkInfo() {
   useEffect(() => {
     void fetchIP()
     void test()
+    return () => {
+      requestId.current++
+    }
   }, [])
   return (
     <div className="dashboard-grid">
