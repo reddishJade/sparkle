@@ -35,7 +35,11 @@ with sync_playwright() as p:
  errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
  latency=page.evaluate('()=>window.electron.ipcRenderer.invoke("getNetworkLatencies",[{name:"Local fixture",url:"http://127.0.0.1:18081/"}])')
  assert isinstance(latency['Local fixture'],(int,float)) and latency['Local fixture']>0,latency
- print('PASS: custom latency URL through Electron network stack',latency,flush=True)
+ print('PASS: custom latency URL through running Mihomo',latency,flush=True)
+ assert opener.open(urllib.request.Request('http://localhost:18081/',method='HEAD')).status==200
+ rejected=page.evaluate('()=>window.electron.ipcRenderer.invoke("getNetworkLatencies",[{name:"Rule rejected",url:"http://localhost:18081/"}])')
+ assert rejected['Rule rejected'] is None,rejected
+ print('PASS: active DOMAIN rule rejects a directly reachable probe target',flush=True)
  if page.locator('.driver-popover-close-btn').count(): page.locator('.driver-popover-close-btn').click()
  page.evaluate("location.hash='/home'")
  page.get_by_text('网络拓扑',exact=True).wait_for()

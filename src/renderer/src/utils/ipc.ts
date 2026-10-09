@@ -1,4 +1,4 @@
-import type { NetworkTarget } from '../../../shared/network-targets'
+import type { NetworkTarget, NetworkIPInfo } from '../../../shared/network-targets'
 import { TitleBarOverlayOptions } from 'electron'
 import type { TrafficStatsSummary, TrafficTimeRange } from '../../../shared/types/traffic'
 
@@ -625,9 +625,7 @@ export async function setUsageRetention(value: number): Promise<void> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('setUsageRetention', value))
 }
 
-export async function getNetworkInfo(
-  provider: string
-): Promise<{ address: string; location: string; org: string }> {
+export async function getNetworkInfo(provider: string): Promise<NetworkIPInfo> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkInfo', provider))
 }
 export async function getNetworkLatencies(

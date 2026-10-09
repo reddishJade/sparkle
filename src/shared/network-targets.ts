@@ -3,6 +3,16 @@ export interface NetworkTarget {
   name: string
   url: string
 }
+export interface NetworkIPInfo {
+  address: string
+  country?: string
+  city?: string
+  org?: string
+  asn?: number
+  isp?: string
+  isProxy?: boolean
+  isVPN?: boolean
+}
 export const latencyTargets: NetworkTarget[] = [
   { name: 'Google', url: 'https://www.google.com/generate_204' },
   { name: 'Cloudflare', url: 'https://cp.cloudflare.com/generate_204' },

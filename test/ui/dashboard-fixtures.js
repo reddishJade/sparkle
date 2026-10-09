@@ -159,7 +159,13 @@ window.electron = {
       if (name === 'mihomoVersion') return { version: '1.19.0', meta: true }
       if (name === 'getVersion') return '1.26.9'
       if (name === 'getNetworkInfo')
-        return { address: '203.0.113.42', location: 'Singapore', org: 'Example ISP' }
+        return {
+          address: '203.0.113.42',
+          country: 'Singapore',
+          city: 'Singapore',
+          org: 'Example ISP',
+          asn: 64500
+        }
       if (name === 'getNetworkLatencies')
         return Object.fromEntries(
           (args[0] ?? [{ name: 'Google' }, { name: 'Cloudflare' }, { name: 'GitHub' }]).map(

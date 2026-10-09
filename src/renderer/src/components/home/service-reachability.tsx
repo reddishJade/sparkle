@@ -1,15 +1,12 @@
-// metacubexd streaming/AI reachability uses Mihomo's delay probe through a selected group/node.
+// Service requests follow the running configuration's rules through Mihomo's HTTP listener.
 import { Button } from '@heroui/react'
 import { useEffect, useState } from 'react'
 import { FiPlay, FiSettings } from 'react-icons/fi'
 import { streamingTargets } from '../../../../shared/network-targets'
-import { useGroups } from '@renderer/hooks/use-groups'
-import { mihomoProxyDelay } from '@renderer/utils/ipc'
-import DashboardSelect from '../base/dashboard-select'
+import { getNetworkLatencies } from '@renderer/utils/ipc'
 import ProbeTargetsDialog from './probe-targets-dialog'
 import { readTargets } from './probe-preferences'
 export default function ServiceReachability() {
-  const { groups = [] } = useGroups()
   const [targets, setTargets] = useState(() =>
     readTargets('home-service-targets', streamingTargets)
   )
@@ -31,36 +28,20 @@ export default function ServiceReachability() {
       ? ['YouTube', 'Netflix', 'OpenAI', 'Gemini']
       : targets.slice(0, 4).map((target) => target.name)
   })
-  const names = [
-    ...new Set(groups.flatMap((group) => [group.name, ...group.all.map((node) => node.name)]))
-  ]
-  const [node, setNode] = useState(() => localStorage.getItem('home-service-node') ?? '')
-  const currentNode = names.includes(node) ? node : (names[0] ?? '')
   const [results, setResults] = useState<Record<string, number | null>>({})
   const [testing, setTesting] = useState(false)
   const [editing, setEditing] = useState(false)
   useEffect(() => {
     setResults({})
-  }, [currentNode, targets, selected])
+  }, [targets, selected])
   async function test(): Promise<void> {
-    if (!currentNode) return
     setTesting(true)
     setResults({})
+    const visibleTargets = targets.filter((target) => selected.includes(target.name))
     try {
-      await Promise.all(
-        targets
-          .filter((target) => selected.includes(target.name))
-          .map(async (target) => {
-            let delay: number | null = null
-            try {
-              const result = await mihomoProxyDelay(currentNode, target.url)
-              delay = typeof result.delay === 'number' && result.delay > 0 ? result.delay : null
-            } catch {
-              /* one failed service must not cancel other probes */
-            }
-            setResults((previous) => ({ ...previous, [target.name]: delay }))
-          })
-      )
+      setResults(await getNetworkLatencies(visibleTargets))
+    } catch {
+      setResults(Object.fromEntries(visibleTargets.map((target) => [target.name, null])))
     } finally {
       setTesting(false)
     }
@@ -85,7 +66,7 @@ export default function ServiceReachability() {
             isIconOnly
             aria-label="开始流媒体 AI 检测"
             variant="ghost"
-            isDisabled={testing || !currentNode}
+            isDisabled={testing}
             onPress={() => void test()}
           >
             <FiPlay />
@@ -93,17 +74,6 @@ export default function ServiceReachability() {
         </div>
       </div>
       <div className="home-unit-body">
-        <DashboardSelect
-          label="检测节点或分组"
-          className="w-full mb-2"
-          value={currentNode}
-          isDisabled={testing || !names.length}
-          options={names.map((name) => [name, name])}
-          onChange={(value) => {
-            localStorage.setItem('home-service-node', value)
-            setNode(value)
-          }}
-        />
         {selected.map((name) => (
           <div key={name} className="home-unit-row">
             <span className="truncate">{name}</span>
@@ -127,7 +97,7 @@ export default function ServiceReachability() {
           </div>
         ))}
       </div>
-      <p className="text-xs text-foreground-500 mt-2">服务连通性</p>
+      <p className="text-xs text-foreground-500 mt-2">按当前规则检测</p>
       {editing && (
         <ProbeTargetsDialog
           title="流媒体 / AI 检测项目"

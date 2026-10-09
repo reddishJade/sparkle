@@ -36,8 +36,10 @@ with sync_playwright() as p:
     page.get_by_role('button',name='开始流媒体 AI 检测',exact=True).wait_for(state='visible')
     page.wait_for_timeout(200)
     assert page.evaluate("JSON.parse(localStorage.getItem('home-service-selected'))") == ['YouTube','OpenAI','Gemini','Disney+']
-    urls = [call[2] for call in page.evaluate('window.__calls') if call[0] == 'mihomoProxyDelay']
+    urls = [target['url'] for call in page.evaluate('window.__calls') if call[0] == 'getNetworkLatencies' for target in (call[1] or [])]
     assert 'https://www.disneyplus.com/' in urls and not any('netflix.com' in url for url in urls)
+    assert page.get_by_role('button', name=re.compile('检测节点或分组')).count() == 0
+    assert not any(call[0] == 'mihomoProxyDelay' for call in page.evaluate('window.__calls'))
     assert page.locator('.topology-node').count()>0
     page.locator('.topology-node').filter(has_text='Tokyo').first.click()
     page.locator('.topology-node').filter(has_text='DomainSuffix').first.click()

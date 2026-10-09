@@ -55,7 +55,7 @@ write('profiles/integration.yaml', {
       payload: ['IP-CIDR,127.0.0.0/8,no-resolve']
     }
   },
-  rules: ['RULE-SET,LocalRules,Test Group', 'MATCH,Test Group']
+  rules: ['DOMAIN,localhost,REJECT', 'RULE-SET,LocalRules,Test Group', 'MATCH,Test Group']
 })
 fs.writeFileSync(
   path.join(dir, 'launch.cjs'),

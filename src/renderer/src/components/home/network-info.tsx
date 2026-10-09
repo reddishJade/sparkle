@@ -4,6 +4,7 @@ import DashboardSelect from '@renderer/components/base/dashboard-select'
 import { FiRefreshCw } from 'react-icons/fi'
 import { Button } from '@heroui/react'
 import { useEffect, useRef, useState } from 'react'
+import type { NetworkIPInfo } from '../../../../shared/network-targets'
 const providers = {
   'ip.sb': 'https://api.ip.sb/geoip',
   'ipwho.is': 'https://ipwho.is/',
@@ -11,7 +12,7 @@ const providers = {
 }
 export default function NetworkInfo() {
   const [provider, setProvider] = useState<keyof typeof providers>('ip.sb')
-  const [ip, setIp] = useState<{ address: string; location: string; org: string }>()
+  const [ip, setIp] = useState<NetworkIPInfo>()
   const [ipError, setIpError] = useState('')
   const [loading, setLoading] = useState(false)
   const requestId = useRef(0)
@@ -51,27 +52,44 @@ export default function NetworkInfo() {
         </Button>
       </div>
       <div className="home-unit-body">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <DashboardSelect
-              label="IP 查询服务"
-              className="w-full"
-              value={provider}
-              options={Object.keys(providers).map((name) => [name, name])}
-              onChange={(value) => {
-                const next = value as keyof typeof providers
-                setProvider(next)
-                void fetchIP(next)
-              }}
-            />
+        <DashboardSelect
+          label="IP 查询服务"
+          className="ip-provider"
+          value={provider}
+          options={Object.keys(providers).map((name) => [name, name])}
+          onChange={(value) => {
+            const next = value as keyof typeof providers
+            setProvider(next)
+            void fetchIP(next)
+          }}
+        />
+        <div className="home-unit-row ip-address">
+          <span>IP</span>
+          <span className="select-text">{loading ? '正在查询…' : (ip?.address ?? '—')}</span>
+        </div>
+        {ip &&
+          [
+            ['国家', ip.country],
+            ['城市', ip.city],
+            ['组织', ip.org],
+            ['ASN', ip.asn ? `AS${ip.asn}` : undefined],
+            ['ISP', ip.isp]
+          ].map(([label, value]) =>
+            value ? (
+              <div className="home-unit-row ip-detail" key={label}>
+                <span>{label}</span>
+                <span className="truncate select-text">{value}</span>
+              </div>
+            ) : null
+          )}
+        {ip && (ip.isProxy !== undefined || ip.isVPN !== undefined) && (
+          <div className="home-unit-row ip-detail">
+            <span>代理检测</span>
+            <span>
+              {[ip.isProxy && 'Proxy', ip.isVPN && 'VPN'].filter(Boolean).join(' · ') || '纯净'}
+            </span>
           </div>
-        </div>
-        <div className="text-xl font-semibold select-text my-3">
-          {loading ? '正在查询…' : (ip?.address ?? '—')}
-        </div>
-        <p className="text-sm text-foreground-500">
-          {ip?.location} {ip?.org}
-        </p>
+        )}
         {ipError && (
           <p role="alert" className="text-sm text-danger">
             {ipError}

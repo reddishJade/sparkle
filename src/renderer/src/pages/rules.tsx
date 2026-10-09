@@ -3,7 +3,7 @@ import { Separator, InputGroup, Button } from '@heroui/react'
 import RuleProvider from '@renderer/components/resources/rule-provider'
 import BasePage from '@renderer/components/base/base-page'
 import RuleItem from '@renderer/components/rules/rule-item'
-import { VirtuosoGrid } from 'react-virtuoso'
+import { Virtuoso } from 'react-virtuoso'
 import { MdSort } from 'react-icons/md'
 import { useMemo, useState } from 'react'
 import { useRules } from '@renderer/hooks/use-rules'
@@ -162,9 +162,7 @@ const Rules: React.FC = () => {
                 <Separator />
               </div>
               <div className="rules-workspace flex-1 min-h-0 mt-px">
-                <VirtuosoGrid
-                  listClassName="rules-grid"
-                  itemClassName="rules-grid-item"
+                <Virtuoso
                   data={filteredRules}
                   context={{ totalHitCount }}
                   itemContent={(_i, rule, context) => (

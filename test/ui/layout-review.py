@@ -21,6 +21,8 @@ with sync_playwright() as p:
             assert page.locator('.topology-viewport').bounding_box()['height'] <= 232
             sizes = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => ({width:card.offsetWidth,height:card.offsetHeight}))')
             assert len(sizes) == 4 and all(size == sizes[0] for size in sizes)
+            positions = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => Math.round(card.getBoundingClientRect().top))')
+            assert len(set(positions)) == 1, positions
             page.screenshot(path=f'/tmp/sparkle-dense-home-{theme}-{width}.png')
             assert page.locator('.home-bottom > .home-unit').last.locator('.home-unit-row').count() == 4
             page.locator('.home-bottom > .home-unit').last.scroll_into_view_if_needed()
@@ -38,10 +40,12 @@ with sync_playwright() as p:
             page.evaluate("location.hash='/rules'")
             page.get_by_text('emby.yzt.lol', exact=True).wait_for()
             page.wait_for_timeout(300)
-            cards = page.locator('.rule-grid-card')
+            cards = page.locator('.rule-list-row')
             first, second = cards.nth(0).bounding_box(), cards.nth(1).bounding_box()
-            assert (abs(first['y']-second['y']) < 2) == (width == 1200)
-            assert page.locator('.rule-grid-card').evaluate_all('(cards) => cards.every(card => card.scrollHeight <= card.clientHeight + 2)')
+            assert first['y'] < second['y'] and abs(first['x']-second['x']) < 2
+            assert page.locator('.rule-list-row').evaluate_all('(cards) => cards.every(card => card.scrollHeight <= card.clientHeight + 2)')
+            indices = page.locator('.rule-order').all_text_contents()
+            assert [int(index) for index in indices] == list(range(1, len(indices)+1))
             page.screenshot(path=f'/tmp/sparkle-dense-rules-{theme}-{width}.png')
             page.locator('.rules-workspace [data-virtuoso-scroller]').evaluate('(el) => el.scrollTop = el.scrollHeight')
             page.get_by_text('Match', exact=True).last.wait_for()
