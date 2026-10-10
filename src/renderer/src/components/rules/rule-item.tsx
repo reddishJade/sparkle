@@ -1,16 +1,9 @@
-import { Chip, Switch } from '@heroui/react'
+import { Card, Chip, Switch } from '@heroui/react'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useRules } from '@renderer/hooks/use-rules'
 import { mihomoRulesDisable } from '@renderer/utils/ipc'
 import RuleDetailTooltip from './rule-detail-tooltip'
-
-import relativeTime from 'dayjs/plugin/relativeTime'
-import 'dayjs/locale/zh-cn'
-import dayjs from 'dayjs'
-
-dayjs.extend(relativeTime)
-dayjs.locale('zh-cn')
 
 interface Props {
   rule: ControllerRulesDetail
@@ -73,53 +66,39 @@ const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0 }) => {
   }
 
   return (
-    <div className="rule-list-row">
-      <span className="rule-order">{rule.index + 1}</span>
-      <div className="rule-identity">
-        <div className="truncate font-semibold" title={rule.payload || 'Match'}>
-          {rule.payload || 'Match'}
-        </div>
-        <div className="rule-mainline flex items-center gap-2 text-xs">
-          <Chip size="sm" data-color="primary" variant="soft">
-            <Chip.Label>{rule.type}</Chip.Label>
-          </Chip>
-          <span className="text-foreground-500">→</span>
-          <span className="truncate text-foreground-500">{rule.proxy}</span>
-        </div>
-      </div>
-      <div className="rule-statistics">
-        <div
-          className="flex items-center justify-end gap-3 text-xs"
-          ref={wrapperRef}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          <span>
-            命中 <span className="text-success">{hitCount ?? 0}</span>
-          </span>
-          <span>
-            未命中 <span className="text-foreground-500">{rule.extra.missCount ?? 0}</span>
-          </span>
-          {hitCount > 0 && totalHitCount > 0 && (
-            <span className="text-foreground-500">{hitRatioText}</span>
-          )}
-        </div>
-        <div className="rule-times text-xs text-foreground-500">
-          {rule.extra.hitAt && Date.parse(rule.extra.hitAt) > 0 && (
-            <span>最近命中 {dayjs(rule.extra.hitAt).fromNow()}</span>
-          )}
-          {rule.extra.missAt && Date.parse(rule.extra.missAt) > 0 && (
-            <span>最近未命中 {dayjs(rule.extra.missAt).fromNow()}</span>
-          )}
-        </div>
-      </div>
-      <Switch size="sm" isSelected={isEnabled} onChange={handleToggle} aria-label="启用">
-        <Switch.Content>
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch.Content>
-      </Switch>
+    <div className="rule-list-row" data-rule-index={rule.index}>
+      <Card>
+        <Card.Content className="rule-card-content">
+          <div className="rule-identity">
+            <div className="truncate rule-name" title={rule.payload || 'Match'}>
+              {rule.payload || 'Match'}
+            </div>
+            <div className="rule-mainline text-foreground-500">
+              <span>{rule.type}</span>
+              <span className="truncate">{rule.proxy}</span>
+            </div>
+          </div>
+          <div
+            className="rule-actions"
+            ref={wrapperRef}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            <Switch size="sm" isSelected={isEnabled} onChange={handleToggle} aria-label="启用">
+              <Switch.Content>
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch.Content>
+            </Switch>
+            {hitCount > 0 && totalHitCount > 0 && (
+              <Chip size="sm" data-color="primary" variant="soft" aria-label="命中占比">
+                <Chip.Label>{hitRatioText}</Chip.Label>
+              </Chip>
+            )}
+          </div>
+        </Card.Content>
+      </Card>
       <RuleDetailTooltip
         rule={rule}
         totalHitCount={totalHitCount}

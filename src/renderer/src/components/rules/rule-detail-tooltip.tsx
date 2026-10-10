@@ -133,6 +133,10 @@ const RuleDetailTooltip: React.FC<Props> = ({ rule, totalHitCount = 0, anchorEl,
               <span className="text-[10px] text-muted justify-self-end">
                 {hitCount.toLocaleString()}
               </span>
+              <span className="text-[10px] text-muted">未命中次数</span>
+              <span className="text-[10px] text-muted justify-self-end">
+                {missCount.toLocaleString()}
+              </span>
 
               {totalHitCount > 0 && (
                 <>
@@ -153,6 +157,14 @@ const RuleDetailTooltip: React.FC<Props> = ({ rule, totalHitCount = 0, anchorEl,
                   <span className="text-[10px] text-muted">最后命中</span>
                   <span className="text-[10px] text-muted justify-self-end">
                     {dayjs(hitAt).fromNow()}
+                  </span>
+                </>
+              )}
+              {!isZeroTime(missAt) && (
+                <>
+                  <span className="text-[10px] text-muted">最近未命中</span>
+                  <span className="text-[10px] text-muted justify-self-end">
+                    {dayjs(missAt).fromNow()}
                   </span>
                 </>
               )}

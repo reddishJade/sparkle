@@ -516,50 +516,40 @@
   color: var(--muted);
 }
 .rules-workspace {
-  margin: 8px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  margin: 0 8px 8px;
 }
 .rule-list-row {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) minmax(0, 1fr) auto;
+  padding-top: 8px;
+}
+.rule-card-content {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
   align-items: center;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
   min-height: 76px;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
 }
-.rule-order {
-  color: var(--muted);
-  font-size: 12px;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.rule-identity,
-.rule-statistics {
+.rule-identity {
   min-width: 0;
+}
+.rule-name {
+  font-size: 16px;
+  font-weight: 400;
 }
 .rule-mainline {
-  min-width: 0;
-  margin-top: 6px;
-  overflow: hidden;
-}
-.rule-mainline [data-slot='chip'] {
-  border-radius: 4px;
-}
-.rule-times {
   display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 6px;
-  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
 }
-.rule-times > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.rule-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
 }
 @container providers (max-width: 719px) {
   .provider-grid {
@@ -585,13 +575,15 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
+  padding: 0;
+  flex-wrap: wrap;
 }
 .rule-filter-targets {
   flex-wrap: wrap;
+}
+.rule-filter-group + .rule-filter-group {
+  border-left: 1px solid var(--border);
+  padding-left: 8px;
 }
 
 .home-bottom {
