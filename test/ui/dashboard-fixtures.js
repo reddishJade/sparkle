@@ -144,7 +144,13 @@ window.electron = {
               payload: 'example.com',
               proxy: 'Proxy',
               size: 1,
-              extra: { hitCount: 5, disabled: false }
+              extra: {
+                hitCount: 5,
+                missCount: 2,
+                hitAt: '1970-01-01T00:00:00Z',
+                missAt: '1970-01-01T00:00:00Z',
+                disabled: false
+              }
             },
             {
               index: 1,
@@ -152,7 +158,13 @@ window.electron = {
               payload: '',
               proxy: 'DIRECT',
               size: 1,
-              extra: { hitCount: 3, disabled: false }
+              extra: {
+                hitCount: 3,
+                missCount: 0,
+                hitAt: '1970-01-01T00:00:00Z',
+                missAt: '1970-01-01T00:00:00Z',
+                disabled: false
+              }
             }
           ]
         }

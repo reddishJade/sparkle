@@ -1,4 +1,4 @@
-import json, time, threading, socket, urllib.request
+import json, time, threading, socket, urllib.request, re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 
@@ -33,6 +33,7 @@ with sync_playwright() as p:
  assert runtime['mixed-port']==17893 and not runtime.get('tun',{}).get('enable',False)
  assert 'LocalRules' in runtime.get('rule-providers',{}) and not config['sysProxy']['enable']
  errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
+ page.get_by_text('已连接到 Mihomo',exact=True).wait_for(timeout=15000)
  latency=page.evaluate('()=>window.electron.ipcRenderer.invoke("getNetworkLatencies",[{name:"Local fixture",url:"http://127.0.0.1:18081/"}])')
  assert isinstance(latency['Local fixture'],(int,float)) and latency['Local fixture']>0,latency
  print('PASS: custom latency URL through running Mihomo',latency,flush=True)
@@ -62,6 +63,22 @@ with sync_playwright() as p:
  page.evaluate("location.hash='/rules'")
  page.get_by_role('button',name='规则提供者',exact=True).click()
  page.get_by_text('LocalRules',exact=True).wait_for()
+ page.locator('.page-tabs').get_by_role('button',name='规则',exact=False).first.click()
+ page.get_by_role('button',name='规则设置',exact=True).click()
+ page.get_by_role('switch',name='禁用规则时打断连接',exact=True).press('Space')
+ page.get_by_role('button',name=re.compile('规则样式')).click()
+ page.get_by_role('option',name='表格',exact=True).click()
+ page.locator('[data-slot="modal-close-trigger"]').click()
+ page.locator('.rule-table th').first.wait_for()
+ page.get_by_role('switch',name='启用规则 2',exact=True).locator('xpath=ancestor::*[@data-slot="switch"]//span[@data-slot="switch-control"]').click()
+ page.wait_for_timeout(500)
+ assert not api('/connections')['connections']
+ stream.close()
+ page.get_by_role('switch',name='启用规则 2',exact=True).locator('xpath=ancestor::*[@data-slot="switch"]//span[@data-slot="switch-control"]').click()
+ page.wait_for_timeout(500)
+ stream=traffic();time.sleep(1)
+ assert api('/connections')['connections']
+ print('PASS: real rule table disable closes matching connections and re-enable restores routing',flush=True)
  page.evaluate("location.hash='/connections'")
  page.get_by_role('button',name='关闭连接',exact=True).first.wait_for()
  assert page.get_by_role('button',name='表格',exact=True).count()==0

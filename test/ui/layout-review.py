@@ -21,8 +21,15 @@ with sync_playwright() as p:
             assert page.locator('.topology-viewport').bounding_box()['height'] <= 232
             sizes = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => ({width:card.offsetWidth,height:card.offsetHeight}))')
             assert len(sizes) == 4 and all(size == sizes[0] for size in sizes)
+            assert sizes[0]['height'] <= 208, sizes
             positions = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => Math.round(card.getBoundingClientRect().top))')
             assert len(set(positions)) == 1, positions
+            bottom = page.locator('.home-bottom').bounding_box()
+            viewport_bottom = page.locator('.content').bounding_box()
+            assert bottom['y']+bottom['height'] >= viewport_bottom['y']+viewport_bottom['height']-16
+            sidebar = page.locator('.sider-cards').bounding_box()
+            log_card = page.locator('.log-card').bounding_box()
+            assert abs(sidebar['width']-log_card['width']) < 2
             page.screenshot(path=f'/tmp/sparkle-dense-home-{theme}-{width}.png')
             assert page.locator('.home-bottom > .home-unit').last.locator('.home-unit-row').count() == 4
             page.locator('.home-bottom > .home-unit').last.scroll_into_view_if_needed()
@@ -50,12 +57,19 @@ with sync_playwright() as p:
             indices = page.locator('.rule-list-row').evaluate_all('(rows) => rows.map(row => Number(row.dataset.ruleIndex) + 1)')
             assert [int(index) for index in indices] == list(range(1, len(indices)+1))
             page.screenshot(path=f'/tmp/sparkle-dense-rules-{theme}-{width}.png')
+            before = page.evaluate('window.__calls.filter(call => call[0] === "mihomoRules").length')
+            page.get_by_role('button', name='更新规则集 reject', exact=True).click()
+            page.wait_for_function('(before) => window.__calls.filter(call => call[0] === "mihomoRules").length > before', arg=before)
             page.locator('.rule-actions').first.hover()
             page.get_by_text('未命中次数', exact=True).wait_for()
             page.get_by_text('最近未命中', exact=True).wait_for()
             page.mouse.move(0, 0)
-            page.locator('.rules-workspace [data-virtuoso-scroller]').evaluate('(el) => el.scrollTop = el.scrollHeight')
-            page.get_by_text('Match', exact=True).last.wait_for()
+            page.wait_for_function('''() => {
+                const scroller = document.querySelector('.rules-workspace [data-virtuoso-scroller]');
+                scroller.scrollTop = scroller.scrollHeight;
+                return !!document.querySelector('.rule-list-row[data-rule-index="25"]');
+            }''')
+            page.locator('.rule-list-row[data-rule-index="25"] .rule-name').wait_for()
             page.evaluate("location.hash='/proxies'")
             page.get_by_role('button', name='代理提供者', exact=True).click()
             page.get_by_role('button', name='查看节点 (5)', exact=True).click()

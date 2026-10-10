@@ -4,7 +4,7 @@ import { logRuleCandidates } from '@renderer/utils/quick-rule'
 
 import React, { useEffect, useState } from 'react'
 
-const colorMap: Record<LogLevel, string> = {
+export const colorMap: Record<LogLevel, string> = {
   error: 'text-danger',
   warning: 'text-warning',
   info: 'text-primary',
@@ -44,11 +44,10 @@ const LogItemComponent: React.FC<Props> = (props) => {
       className={`px-2 pb-2 transition-[opacity,transform] duration-300 ease-out ${entered ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'} ${index === 0 ? 'pt-2' : ''}`}
     >
       <Card className={animateOnMount ? 'ring-1 ring-primary/12' : ''}>
-        <Card.Header className="pb-0 pt-1">
-          <div className={`mr-2 text-lg font-bold ${colorMap[type]}`}>
-            {props.type.toUpperCase()}
-          </div>
-          <small className="text-foreground-500">{time}</small>
+        <Card.Header className="log-card-heading pb-0 pt-1">
+          <small className="text-foreground-500">{index}</small>
+          <div className={`text-xs font-medium ${colorMap[type]}`}>{props.type.toUpperCase()}</div>
+          <small className="text-foreground-500 ml-auto">{time}</small>
         </Card.Header>
         <Card.Content className="select-text pt-0 text-sm">{payload}</Card.Content>
       </Card>

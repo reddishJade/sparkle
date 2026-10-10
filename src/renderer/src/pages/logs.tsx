@@ -6,7 +6,7 @@ import LogItem from '@renderer/components/logs/log-item'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
 import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-config'
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, TableVirtuoso } from 'react-virtuoso'
 import { IoLocationSharp, IoPause, IoPlay } from 'react-icons/io5'
 import { CgTrash } from 'react-icons/cg'
 
@@ -22,6 +22,10 @@ import {
 import { restartMihomoLogs } from '@renderer/utils/ipc'
 import { notify } from '@renderer/utils/notification'
 
+import { MdTune } from 'react-icons/md'
+import PageViewSettings from '@renderer/components/base/page-view-settings'
+import DashboardSelect from '@renderer/components/base/dashboard-select'
+import LogTableRow from '@renderer/components/logs/log-table-row'
 const logLevelOrder: Record<LogLevel, number> = {
   silent: 0,
   error: 1,
@@ -55,6 +59,8 @@ const freshLogAnimationDurationMs = 360
 
 const Logs: React.FC = () => {
   const { appConfig, patchAppConfig } = useAppConfig()
+  const { logView = 'cards' } = appConfig || {}
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const { controledMihomoConfig } = useControledMihomoConfig()
   const { maxLogEntries = 500, realtimeLogLevel } = appConfig || {}
   const { 'log-level': logLevel = 'info' } = controledMihomoConfig || {}
@@ -144,7 +150,37 @@ const Logs: React.FC = () => {
   }, [maxLogEntries])
 
   return (
-    <BasePage title="实时日志" contentClassName="overflow-y-hidden">
+    <BasePage
+      title="实时日志"
+      contentClassName="overflow-y-hidden"
+      header={
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          aria-label="日志设置"
+          onPress={() => setSettingsOpen(true)}
+        >
+          <MdTune />
+        </Button>
+      }
+    >
+      {settingsOpen && (
+        <PageViewSettings title="日志设置" onClose={() => setSettingsOpen(false)}>
+          <div className="view-setting-row">
+            <span>日志样式</span>
+            <DashboardSelect
+              label="日志样式"
+              value={logView}
+              options={[
+                ['cards', '卡片'],
+                ['table', '表格']
+              ]}
+              onChange={(value) => void patchAppConfig({ logView: value as 'cards' | 'table' })}
+            />
+          </div>
+        </PageViewSettings>
+      )}
       <div className="flex h-full min-h-0 flex-col">
         <div className="sticky top-0 z-40">
           <div className="flex w-full items-center gap-2 p-2">
@@ -290,24 +326,46 @@ const Logs: React.FC = () => {
           <Separator />
         </div>
         <div className="min-h-0 flex-1 pt-2">
-          <Virtuoso
-            className="h-full pr-1"
-            data={filteredLogs}
-            initialTopMostItemIndex={filteredLogs.length > 0 ? filteredLogs.length - 1 : undefined}
-            followOutput={trace && !paused}
-            computeItemKey={(_index, log) => log.id}
-            itemContent={(i, log) => {
-              return (
-                <LogItem
-                  index={i}
-                  animateOnMount={!paused && freshLogIdSet.has(log.id)}
-                  time={log.time}
-                  type={log.type}
-                  payload={log.payload}
-                />
-              )
-            }}
-          />
+          {logView === 'table' ? (
+            <TableVirtuoso
+              className="log-table h-full"
+              data={filteredLogs}
+              initialTopMostItemIndex={
+                filteredLogs.length > 0 ? filteredLogs.length - 1 : undefined
+              }
+              followOutput={trace && !paused}
+              computeItemKey={(_index, log) => log.id}
+              fixedHeaderContent={() => (
+                <tr>
+                  {['#', '时间', '日志等级', '内容'].map((label) => (
+                    <th key={label}>{label}</th>
+                  ))}
+                </tr>
+              )}
+              itemContent={(index, log) => <LogTableRow log={log} index={index} />}
+            />
+          ) : (
+            <Virtuoso
+              className="h-full pr-1"
+              data={filteredLogs}
+              initialTopMostItemIndex={
+                filteredLogs.length > 0 ? filteredLogs.length - 1 : undefined
+              }
+              followOutput={trace && !paused}
+              computeItemKey={(_index, log) => log.id}
+              itemContent={(i, log) => {
+                return (
+                  <LogItem
+                    index={log.seq ?? i + 1}
+                    animateOnMount={!paused && freshLogIdSet.has(log.id)}
+                    time={log.time}
+                    type={log.type}
+                    payload={log.payload}
+                  />
+                )
+              }}
+            />
+          )}
         </div>
       </div>
     </BasePage>

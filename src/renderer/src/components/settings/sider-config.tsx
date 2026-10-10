@@ -27,7 +27,7 @@ const SiderConfig: React.FC = () => {
     connectionCardStatus = 'col-span-2',
     trafficCardStatus = 'col-span-2',
     mihomoCoreCardStatus = 'col-span-2',
-    logCardStatus = 'col-span-1'
+    logCardStatus = 'col-span-2'
   } = appConfig || {}
 
   const cardStatus = {

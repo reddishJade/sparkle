@@ -96,9 +96,18 @@ interface Props {
 export default function SiderCards({ iconOnly = false }: Props): React.JSX.Element {
   const { appConfig, patchAppConfig } = useAppConfig()
   const siderOrder = useMemo(() => {
-    const raw = (appConfig?.siderOrder ?? defaultSiderOrder).filter((id) => id in componentMap)
+    const raw = [
+      ...new Set((appConfig?.siderOrder ?? defaultSiderOrder).filter((id) => id in componentMap))
+    ]
     const missing = defaultSiderOrder.filter((id) => !raw.includes(id))
-    return missing.length > 0 ? [...raw, ...missing] : raw
+    for (const id of missing) {
+      const previous = defaultSiderOrder
+        .slice(0, defaultSiderOrder.indexOf(id))
+        .reverse()
+        .find((candidate) => raw.includes(candidate))
+      raw.splice(previous ? raw.indexOf(previous) + 1 : 0, 0, id)
+    }
+    return raw
   }, [appConfig?.siderOrder])
   const [order, setOrder] = useState(siderOrder)
   const gridRef = useRef<HTMLDivElement>(null)

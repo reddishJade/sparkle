@@ -33,6 +33,12 @@ interface IHost {
 }
 
 interface AppConfig {
+  ruleView?: 'cards' | 'table'
+  ruleShowNode?: boolean
+  ruleShowDelay?: boolean
+  ruleDisconnect?: boolean
+  logView?: 'cards' | 'table'
+
   updateChannel: AppUpdateChannel
   notificationMode?: AppNotificationMode
   showUpdateButtonAfterNotification?: boolean

@@ -1,17 +1,19 @@
-import { Card, Chip, Switch } from '@heroui/react'
+import { Button, Card, Chip, Switch } from '@heroui/react'
+import { FiRefreshCw } from 'react-icons/fi'
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useRules } from '@renderer/hooks/use-rules'
-import { mihomoRulesDisable } from '@renderer/utils/ipc'
+import { notify } from '@renderer/utils/notification'
 import RuleDetailTooltip from './rule-detail-tooltip'
 
 interface Props {
+  policy: React.ReactNode
+  onToggle: (enabled: boolean) => Promise<void>
+  onUpdate: () => Promise<void>
   rule: ControllerRulesDetail
   totalHitCount?: number
 }
 
-const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0 }) => {
-  const { mutate } = useRules()
+const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0, policy, onToggle, onUpdate }) => {
   const [isEnabled, setIsEnabled] = useState(!rule.extra.disabled)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -58,10 +60,10 @@ const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0 }) => {
   const handleToggle = async (v: boolean): Promise<void> => {
     setIsEnabled(v)
     try {
-      await mihomoRulesDisable({ [rule.index]: !v })
-      mutate()
-    } catch {
+      await onToggle(v)
+    } catch (error) {
       setIsEnabled(!v)
+      notify(error, { variant: 'danger' })
     }
   }
 
@@ -70,12 +72,31 @@ const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0 }) => {
       <Card>
         <Card.Content className="rule-card-content">
           <div className="rule-identity">
-            <div className="truncate rule-name" title={rule.payload || 'Match'}>
-              {rule.payload || 'Match'}
+            <div className="rule-card-name-row">
+              <span className="text-xs text-foreground-500">{rule.index + 1}</span>
+              <div className="truncate rule-name" title={rule.payload || 'Match'}>
+                {rule.payload || 'Match'}
+              </div>
+              {rule.type === 'RuleSet' && (
+                <>
+                  <span className="text-xs text-foreground-500">
+                    ({rule.size.toLocaleString()})
+                  </span>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`更新规则集 ${rule.payload}`}
+                    onPress={() => void onUpdate()}
+                  >
+                    <FiRefreshCw />
+                  </Button>
+                </>
+              )}
             </div>
             <div className="rule-mainline text-foreground-500">
               <span>{rule.type}</span>
-              <span className="truncate">{rule.proxy}</span>
+              <span className="truncate">{policy}</span>
             </div>
           </div>
           <div

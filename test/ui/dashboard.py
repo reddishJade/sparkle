@@ -60,9 +60,11 @@ with sync_playwright() as p:
     page.get_by_role('button',name='延迟测试',exact=True).click()
     page.get_by_role('button',name='延迟测试',exact=True).wait_for()
     page.evaluate("location.hash='/rules'")
-    page.get_by_role('button',name='已禁用',exact=True).click()
+    page.get_by_role('button',name=re.compile('规则状态')).click()
+    page.get_by_role('option',name='已禁用',exact=True).click()
     assert page.get_by_text('example.com',exact=True).count()==0
-    page.get_by_role('button',name='全部',exact=True).click()
+    page.get_by_role('button',name=re.compile('规则状态')).click()
+    page.get_by_role('option',name='全部',exact=True).click()
     page.screenshot(path='/tmp/sparkle-rules.png',full_page=True)
     page.get_by_role('button',name='规则提供者',exact=True).click()
     page.get_by_text('Geo',exact=True).wait_for()
