@@ -6,6 +6,7 @@ import { notify } from '@renderer/utils/notification'
 import RuleDetailTooltip from './rule-detail-tooltip'
 
 interface Props {
+  count?: number
   policy: React.ReactNode
   onToggle: (enabled: boolean) => Promise<void>
   onUpdate: () => Promise<void>
@@ -13,7 +14,14 @@ interface Props {
   totalHitCount?: number
 }
 
-const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0, policy, onToggle, onUpdate }) => {
+const RuleItem: React.FC<Props> = ({
+  rule,
+  count,
+  totalHitCount = 0,
+  policy,
+  onToggle,
+  onUpdate
+}) => {
   const [isEnabled, setIsEnabled] = useState(!rule.extra.disabled)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -79,9 +87,9 @@ const RuleItem: React.FC<Props> = ({ rule, totalHitCount = 0, policy, onToggle, 
               </div>
               {rule.type === 'RuleSet' && (
                 <>
-                  <span className="text-xs text-foreground-500">
-                    ({rule.size.toLocaleString()})
-                  </span>
+                  {count !== undefined && (
+                    <span className="text-xs text-foreground-500">({count.toLocaleString()})</span>
+                  )}
                   <Button
                     isIconOnly
                     size="sm"

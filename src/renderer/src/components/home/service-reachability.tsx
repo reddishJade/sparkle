@@ -102,7 +102,6 @@ export default function ServiceReachability() {
           </div>
         ))}
       </div>
-      <p className="text-xs text-foreground-500 mt-2">按当前规则检测 · {targets.length} 个项目</p>
       {editing && (
         <ProbeTargetsDialog
           title="流媒体 / AI 检测项目"

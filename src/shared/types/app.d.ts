@@ -3,6 +3,12 @@ interface AppVersion {
   tag?: string
   changelog: string
 }
+interface HomeWidgetConfig {
+  id: string
+  span: 3 | 6 | 9 | 12
+  height: 144 | 208 | 280 | 360
+  hidden?: boolean
+}
 
 type AppUpdateChannel = 'stable' | 'rolling'
 type AppNotificationMode = 'system' | 'toast'
@@ -33,6 +39,7 @@ interface IHost {
 }
 
 interface AppConfig {
+  homeWidgets?: HomeWidgetConfig[]
   ruleView?: 'cards' | 'table'
   ruleShowNode?: boolean
   ruleShowDelay?: boolean

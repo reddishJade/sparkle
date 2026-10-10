@@ -97,6 +97,7 @@ with sync_playwright() as p:
  page.get_by_role('option',name='表格',exact=True).click()
  page.locator('[data-slot="modal-close-trigger"]').click()
  page.locator('.rule-table th').first.wait_for()
+ assert page.locator('.rule-table tbody tr').filter(has=page.get_by_text('LocalRules',exact=True)).locator('td').nth(4).inner_text()=='1'
  page.get_by_role('switch',name='启用规则 2',exact=True).locator('xpath=ancestor::*[@data-slot="switch"]//span[@data-slot="switch-control"]').click()
  page.wait_for_timeout(500)
  assert not api('/connections')['connections']

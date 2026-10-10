@@ -16,7 +16,7 @@ with sync_playwright() as p:
     assert page.get_by_text('外部资源',exact=True).count()==0
     page.wait_for_timeout(1600)
     page.screenshot(path='/tmp/sparkle-home-light.png',full_page=True)
-    units = page.locator('.home-bottom > .home-unit')
+    units = page.locator('.home-widget-body > .home-unit')
     assert units.count() == 4
     assert len(set(units.evaluate_all('(cards) => cards.map(card => card.offsetHeight)'))) == 1
     page.get_by_role('button',name='配置网络延迟网址',exact=True).click()

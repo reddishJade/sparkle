@@ -163,6 +163,12 @@
 .topology-panel h2 {
   margin-bottom: 4px;
 }
+.topology-actions button {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+}
 .usage-period {
   display: flex;
   flex-wrap: wrap;
@@ -172,14 +178,6 @@
   font-size: 11px;
 }
 /* Monitor and usage layouts follow Sparkle's theme variables in both modes. */
-.home-monitor {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  background: var(--surface);
-  border: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
-  border-radius: 8px;
-  overflow: hidden;
-}
 .home-monitor-item {
   min-width: 0;
   padding: 12px;
@@ -213,13 +211,13 @@
   font-size: 11px;
   color: var(--muted);
 }
-.home-monitor .history-chart {
+.home-monitor-item .history-chart {
   margin-top: 10px;
 }
-.home-monitor .history-chart > .flex {
+.home-monitor-item .history-chart > .flex {
   display: none;
 }
-.home-monitor .history-chart svg {
+.home-monitor-item .history-chart svg {
   height: 28px;
   margin: 0;
 }
@@ -587,27 +585,6 @@
   padding-left: 8px;
 }
 
-.home-bottom {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  overflow: hidden;
-}
-.home-bottom .home-unit {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border: 0;
-  border-radius: 0;
-  padding: 12px;
-  background: transparent;
-}
-.home-bottom .home-unit + .home-unit {
-  border-left: 1px solid var(--border);
-}
 .home-unit-heading button {
   width: 24px;
   min-width: 24px;
@@ -694,12 +671,12 @@
   flex-shrink: 1;
   text-align: right;
 }
-.home-bottom .dashboard-rank {
+.home-unit .dashboard-rank {
   padding-block: 7px;
   font-size: 11px;
   gap: 4px;
 }
-.home-bottom .dashboard-rank > :last-child {
+.home-unit .dashboard-rank > :last-child {
   flex-shrink: 0;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -729,11 +706,67 @@
   flex-shrink: 0;
 }
 .home-content {
-  height: 100%;
-  min-height: 780px;
+  height: auto;
+  min-height: 100%;
 }
-.home-content .home-monitor {
-  flex: 0 0 auto;
+.home-widget-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+.home-widget {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-widget-body {
+  min-height: 0;
+  flex: 1;
+}
+.home-widget-body > section {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.home-widget-body > .home-unit,
+.home-widget-body > .topology-panel {
+  display: flex;
+  flex-direction: column;
+}
+.home-widget-body > .topology-panel .topology-viewport {
+  min-height: 0;
+  flex-shrink: 1;
+}
+.home-widget:has(.topology-large) {
+  grid-column: 1 / -1 !important;
+  height: 660px !important;
+}
+.home-widget-handle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  cursor: grab;
+  touch-action: none;
+  color: var(--muted);
+}
+.home-widget-handle:active {
+  cursor: grabbing;
+}
+.home-widget-handle:focus-visible {
+  outline: 2px solid var(--accent);
+}
+.home-widget-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
 }
 .home-traffic-trend {
   flex: 1;
@@ -755,14 +788,6 @@
 }
 .home-content .topology-panel:not(.topology-large) .topology-viewport {
   max-height: 174px;
-}
-.home-content > .home-status,
-.home-content > .topology-panel {
-  flex-shrink: 0;
-}
-.home-content .home-bottom {
-  flex: 0 0 208px;
-  min-height: 208px;
 }
 .view-setting-row {
   display: flex;
@@ -828,15 +853,20 @@
 }
 .log-table table {
   table-layout: fixed;
+  min-width: 640px;
 }
 .log-table th:first-child {
-  width: 72px;
+  width: 64px;
 }
 .log-table th:nth-child(2) {
-  width: 88px;
+  width: 176px;
 }
 .log-table th:nth-child(3) {
-  width: 88px;
+  width: 96px;
+}
+.log-table td:not(:last-child) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .log-table td:last-child {
   overflow-wrap: anywhere;

@@ -6,6 +6,8 @@ import RuleItem from '@renderer/components/rules/rule-item'
 import { Virtuoso, TableVirtuoso } from 'react-virtuoso'
 import DashboardSelect from '@renderer/components/base/dashboard-select'
 import { useMemo, useState } from 'react'
+import useSWR from 'swr'
+import { ruleCount } from '@renderer/components/rules/rule-count'
 import { useRules } from '@renderer/hooks/use-rules'
 import { includesIgnoreCase } from '@renderer/utils/includes'
 
@@ -17,6 +19,7 @@ import { useGroups } from '@renderer/hooks/use-groups'
 import { useLiveData } from '@renderer/hooks/use-live-data'
 import {
   mihomoRulesDisable,
+  mihomoRuleProviders,
   mihomoCloseConnection,
   mihomoUpdateRuleProviders
 } from '@renderer/utils/ipc'
@@ -24,6 +27,11 @@ import { notify } from '@renderer/utils/notification'
 
 const Rules: React.FC = () => {
   const { rules, mutate } = useRules()
+  const { data: providers, mutate: mutateProviders } = useSWR(
+    'mihomoRuleProviders',
+    mihomoRuleProviders,
+    { refreshInterval: 10000 }
+  )
   const { appConfig, patchAppConfig } = useAppConfig()
   const {
     ruleView = 'cards',
@@ -64,6 +72,7 @@ const Rules: React.FC = () => {
   async function updateRule(rule: ControllerRulesDetail): Promise<void> {
     try {
       await mihomoUpdateRuleProviders(rule.payload)
+      void mutateProviders()
       mutate()
     } catch (error) {
       notify(error, { variant: 'danger' })
@@ -308,7 +317,7 @@ const Rules: React.FC = () => {
                         <td>{rule.type}</td>
                         <td>{rule.payload || 'Match'}</td>
                         <td>{policy(rule)}</td>
-                        <td>{rule.size || '—'}</td>
+                        <td>{ruleCount(rule, providers?.providers)?.toLocaleString() ?? '—'}</td>
                         <td>
                           {rule.extra.hitCount.toLocaleString()} /{' '}
                           {rule.extra.missCount.toLocaleString()}
@@ -354,6 +363,7 @@ const Rules: React.FC = () => {
                     itemContent={(_i, rule, context) => (
                       <RuleItem
                         rule={rule}
+                        count={ruleCount(rule, providers?.providers)}
                         totalHitCount={context.totalHitCount}
                         policy={policy(rule)}
                         onToggle={(value) => toggleRule(rule, value)}

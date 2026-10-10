@@ -1,4 +1,13 @@
 import { Button } from '@heroui/react'
+import {
+  FiMaximize2,
+  FiMinimize2,
+  FiPause,
+  FiPlay,
+  FiMinus,
+  FiPlus,
+  FiRefreshCw
+} from 'react-icons/fi'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildTopology, type TopologyNode } from './topology-data'
 import { calcTraffic } from '@renderer/utils/calc'
@@ -61,42 +70,55 @@ export default function NetworkTopology({
       ref={panelRef}
       className={`dashboard-panel topology-panel ${large ? 'topology-large' : ''}`}
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <div>
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <div className="min-w-0">
           <h2>网络拓扑</h2>
-          <p className="text-xs text-foreground-500">
+          <p className="text-xs text-foreground-500 truncate">
             {tree.count} 条活动连接 · {calcTraffic(tree.traffic)}
           </p>
         </div>
-        <div className="flex gap-1">
-          <Button size="sm" variant="ghost" aria-expanded={large} onPress={() => setLarge(!large)}>
-            {large ? '收起视图' : '展开视图'}
+        <div className="flex gap-1 shrink-0 topology-actions">
+          <Button
+            isIconOnly
+            aria-label={large ? '收起视图' : '展开视图'}
+            size="sm"
+            variant="ghost"
+            aria-expanded={large}
+            onPress={() => setLarge(!large)}
+          >
+            {large ? <FiMinimize2 /> : <FiMaximize2 />}
           </Button>
           <Button
             size="sm"
+            isIconOnly
+            aria-label={frozen ? '继续' : '暂停'}
             variant={frozen ? 'primary' : 'ghost'}
             onPress={() => setFrozen(frozen ? null : structuredClone(connections))}
           >
-            {frozen ? '继续' : '暂停'}
+            {frozen ? <FiPlay /> : <FiPause />}
           </Button>
           <Button
             size="sm"
+            isIconOnly
             variant="ghost"
             onPress={() => setZoom(Math.max(0.4, zoom - 0.1))}
             aria-label="缩小"
           >
-            −
+            <FiMinus />
           </Button>
           <Button
             size="sm"
+            isIconOnly
             variant="ghost"
             onPress={() => setZoom(Math.min(2, zoom + 0.1))}
             aria-label="放大"
           >
-            +
+            <FiPlus />
           </Button>
           <Button
             size="sm"
+            isIconOnly
+            aria-label="重置"
             variant="ghost"
             onPress={() => {
               setZoom(1)
@@ -104,7 +126,7 @@ export default function NetworkTopology({
               setSelected(undefined)
             }}
           >
-            重置
+            <FiRefreshCw />
           </Button>
         </div>
       </div>

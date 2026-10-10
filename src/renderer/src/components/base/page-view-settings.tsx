@@ -18,8 +18,8 @@ export default function PageViewSettings({
         }}
         className="top-12 h-[calc(100%-48px)]"
       >
-        <Modal.Container>
-          <Modal.Dialog className="w-96">
+        <Modal.Container scroll="inside">
+          <Modal.Dialog className="w-96 max-h-[calc(100vh-80px)]">
             <Modal.Header>
               <Modal.Heading>{title}</Modal.Heading>
             </Modal.Header>

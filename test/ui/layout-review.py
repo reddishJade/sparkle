@@ -13,28 +13,29 @@ with sync_playwright() as p:
     for theme in ['dark', 'light']:
         page.evaluate('(theme) => window.__setTheme(theme)', theme)
         page.wait_for_function('(theme) => document.documentElement.classList.contains(theme)', arg=theme)
-        for width in [1200, 850]:
+        for width in [1456, 1200, 850]:
             page.set_viewport_size({'width': width, 'height': 900})
             page.evaluate("location.hash='/home'")
             page.wait_for_timeout(700)
             page.locator('.content').evaluate('(el) => el.scrollTop = 0')
             assert page.locator('.topology-viewport').bounding_box()['height'] <= 232
-            assert page.locator('.topology-viewport').evaluate('(el) => el.scrollHeight <= el.clientHeight + 2')
+            topology_size = page.locator('.topology-viewport').evaluate('(el) => ({clientHeight:el.clientHeight,scrollHeight:el.scrollHeight,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth})')
+            assert topology_size['scrollHeight'] <= topology_size['clientHeight'] + 2, (width, topology_size)
             assert page.locator('.home-traffic-trend').evaluate('(el) => el.scrollHeight <= el.clientHeight + 2')
-            sizes = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => ({width:card.offsetWidth,height:card.offsetHeight}))')
+            sizes = page.locator('.home-widget-body > .home-unit').evaluate_all('(cards) => cards.map(card => ({width:card.offsetWidth,height:card.offsetHeight}))')
             assert len(sizes) == 4 and all(size == sizes[0] for size in sizes)
             assert sizes[0]['height'] <= 208, sizes
-            positions = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => Math.round(card.getBoundingClientRect().top))')
+            positions = page.locator('.home-widget-body > .home-unit').evaluate_all('(cards) => cards.map(card => Math.round(card.getBoundingClientRect().top))')
             assert len(set(positions)) == 1, positions
-            bottom = page.locator('.home-bottom').bounding_box()
-            viewport_bottom = page.locator('.content').bounding_box()
-            assert bottom['y']+bottom['height'] >= viewport_bottom['y']+viewport_bottom['height']-16
+            trend = page.locator('[data-home-widget="traffic"]').bounding_box()
+            topology = page.locator('[data-home-widget="topology"]').bounding_box()
+            assert abs(trend['y']-topology['y']) < 2
             sidebar = page.locator('.sider-cards').bounding_box()
             log_card = page.locator('.log-card').bounding_box()
             assert abs(sidebar['width']-log_card['width']) < 2
             page.screenshot(path=f'/tmp/sparkle-dense-home-{theme}-{width}.png')
-            assert page.locator('.home-bottom > .home-unit').last.locator('.home-unit-row').count() == 4
-            page.locator('.home-bottom > .home-unit').last.scroll_into_view_if_needed()
+            assert page.locator('[data-home-widget="services"] .home-unit-row').count() == 4
+            page.locator('[data-home-widget="services"]').scroll_into_view_if_needed()
             page.screenshot(path=f'/tmp/sparkle-dense-bottom-{theme}-{width}.png')
             page.get_by_role('button', name='选择流媒体 AI 检测项目', exact=True).click()
             assert page.locator('.probe-target-row').count() == 40
@@ -79,7 +80,7 @@ with sync_playwright() as p:
             page.wait_for_timeout(400)
             provider_cards = page.locator('.provider-card')
             first, second = provider_cards.nth(0).bounding_box(), provider_cards.nth(1).bounding_box()
-            assert (abs(first['y']-second['y']) < 2) == (width == 1200)
+            assert (abs(first['y']-second['y']) < 2) == (width >= 1200)
             assert page.get_by_role('button', name='健康检查', exact=True).count() == 0
             assert page.get_by_role('button', name='测速', exact=True).count() == 0
             assert page.locator('.provider-node-table tbody tr').count() == 16
