@@ -54,7 +54,8 @@ export default function NetworkTopology({
       width: Math.max(...nodes.map(({ x }) => x + 170))
     }
   }, [tree, overrides])
-  const scale = Math.min(1, availableWidth > 0 ? availableWidth / width : 1) * zoom
+  const scale =
+    Math.min(1, availableWidth > 0 ? availableWidth / width : 1, large ? 1 : 140 / height) * zoom
   return (
     <section
       ref={panelRef}

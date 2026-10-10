@@ -1,5 +1,5 @@
 import { app, ipcMain } from 'electron'
-import { getNetworkInfo, getNetworkLatencies } from '../core/network-info'
+import { getNetworkInfo, getNetworkLatencies, getServiceReachability } from '../core/network-info'
 import {
   mihomoChangeProxy,
   mihomoFlushDns,
@@ -422,6 +422,9 @@ export function registerIpcMainHandlers(): void {
   )
   ipcMain.handle('getNetworkLatencies', (_e, targets) =>
     ipcErrorWrapper(() => getNetworkLatencies(targets))()
+  )
+  ipcMain.handle('getServiceReachability', (_e, targets) =>
+    ipcErrorWrapper(() => getServiceReachability(targets))()
   )
   ipcMain.handle('getUsage', (_e, query) =>
     ipcErrorWrapper(() => trafficStatsService.getUsage(query))()

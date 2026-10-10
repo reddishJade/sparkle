@@ -178,6 +178,10 @@ window.electron = {
           org: 'Example ISP',
           asn: 64500
         }
+      if (name === 'getServiceReachability')
+        return Object.fromEntries(
+          args[0].map(({ name }) => [name, { status: 'reachable', latency: 42 }])
+        )
       if (name === 'getNetworkLatencies')
         return Object.fromEntries(
           (args[0] ?? [{ name: 'Google' }, { name: 'Cloudflare' }, { name: 'GitHub' }]).map(

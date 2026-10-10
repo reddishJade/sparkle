@@ -67,7 +67,7 @@ const BasePage = forwardRef<HTMLDivElement, Props>((props, ref) => {
           <div className="title min-w-0 truncate h-full text-lg leading-8">{props.title}</div>
           <div
             style={{ marginRight: overlayWidth }}
-            className="header flex shrink-0 gap-1 h-full items-center"
+            className="header app-nodrag flex shrink-0 gap-1 h-full items-center"
           >
             {props.header}
             <Button

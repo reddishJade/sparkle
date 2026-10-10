@@ -1,4 +1,8 @@
-import type { NetworkTarget, NetworkIPInfo } from '../../../shared/network-targets'
+import type {
+  NetworkTarget,
+  NetworkIPInfo,
+  ServiceProbeResult
+} from '../../../shared/network-targets'
 import { TitleBarOverlayOptions } from 'electron'
 import type { TrafficStatsSummary, TrafficTimeRange } from '../../../shared/types/traffic'
 
@@ -632,4 +636,11 @@ export async function getNetworkLatencies(
   targets?: NetworkTarget[]
 ): Promise<Record<string, number | null>> {
   return ipcErrorWrapper(await window.electron.ipcRenderer.invoke('getNetworkLatencies', targets))
+}
+export async function getServiceReachability(
+  targets: NetworkTarget[]
+): Promise<Record<string, ServiceProbeResult>> {
+  return ipcErrorWrapper(
+    await window.electron.ipcRenderer.invoke('getServiceReachability', targets)
+  )
 }

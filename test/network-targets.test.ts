@@ -6,7 +6,12 @@ describe('Network probe targets', () => {
     assert.deepEqual(validateNetworkTargets([{ name: ' Local ', url: 'http://127.0.0.1:18081' }]), [
       { name: 'Local', url: 'http://127.0.0.1:18081/' }
     ])
-    assert.equal(validateNetworkTargets(streamingTargets).length, 5)
+    assert.ok(validateNetworkTargets(streamingTargets).length >= 30)
+    for (const name of ['Claude', 'Grok', 'Perplexity', 'Spotify', 'TikTok', 'myTV SUPER'])
+      assert.ok(
+        streamingTargets.some((target) => target.name === name),
+        name
+      )
   })
   it('rejects non-network URLs, credentials, duplicate names and oversized lists', () => {
     for (const url of [

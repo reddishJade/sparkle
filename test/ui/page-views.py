@@ -23,6 +23,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name=re.compile('规则排序')).click()
  page.get_by_role('option',name='命中次数',exact=True).click()
  page.get_by_role('button',name='规则设置',exact=True).click()
+ assert page.get_by_role('button',name='规则设置',exact=True).evaluate("el => getComputedStyle(el.closest('.header')).webkitAppRegion") == 'no-drag'
  page.get_by_role('switch',name='禁用规则时打断连接',exact=True).press('Space')
  page.get_by_role('button',name=re.compile('规则样式')).click()
  page.get_by_role('option',name='表格',exact=True).click()

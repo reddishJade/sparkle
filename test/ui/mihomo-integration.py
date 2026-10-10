@@ -1,4 +1,4 @@
-import json, time, threading, socket, urllib.request, re
+import json, time, threading, socket, urllib.request, re, ctypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from playwright.sync_api import sync_playwright
 
@@ -25,6 +25,28 @@ def traffic():
   except OSError: pass
  threading.Thread(target=consume,daemon=True).start()
  return s
+def native_header_click(page, label):
+ # XTest sends an OS mouse click; CDP clicks alone miss Electron drag-region bugs.
+ page.bring_to_front()
+ button=page.get_by_role('button',name=label,exact=True)
+ rect=button.bounding_box()
+ origin=page.evaluate('({x:screenX,y:screenY})')
+ x11=ctypes.CDLL('libX11.so.6'); xtst=ctypes.CDLL('libXtst.so.6')
+ x11.XOpenDisplay.restype=ctypes.c_void_p
+ x11.XOpenDisplay.argtypes=[ctypes.c_char_p]
+ display=x11.XOpenDisplay(None)
+ assert display, 'Native click requires an isolated X11 display'
+ x11.XFlush.argtypes=[ctypes.c_void_p]
+ x11.XCloseDisplay.argtypes=[ctypes.c_void_p]
+ xtst.XTestFakeMotionEvent.argtypes=[ctypes.c_void_p,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_ulong]
+ xtst.XTestFakeButtonEvent.argtypes=[ctypes.c_void_p,ctypes.c_uint,ctypes.c_int,ctypes.c_ulong]
+ try:
+  xtst.XTestFakeMotionEvent(display,-1,round(origin['x']+rect['x']+rect['width']/2),round(origin['y']+rect['y']+rect['height']/2),0)
+  xtst.XTestFakeButtonEvent(display,1,1,0)
+  xtst.XTestFakeButtonEvent(display,1,0,0)
+  x11.XFlush(display)
+ finally: x11.XCloseDisplay(display)
+ page.get_by_role('heading',name=label,exact=True).wait_for()
 with sync_playwright() as p:
  b=p.chromium.connect_over_cdp('http://127.0.0.1:19223')
  page=b.contexts[0].pages[0]
@@ -41,6 +63,10 @@ with sync_playwright() as p:
  rejected=page.evaluate('()=>window.electron.ipcRenderer.invoke("getNetworkLatencies",[{name:"Rule rejected",url:"http://localhost:18081/"}])')
  assert rejected['Rule rejected'] is None,rejected
  print('PASS: active DOMAIN rule rejects a directly reachable probe target',flush=True)
+ service=page.evaluate('()=>window.electron.ipcRenderer.invoke("getServiceReachability",[{name:"Routed fixture",url:"http://127.0.0.1:18081/"},{name:"Rule rejected",url:"http://localhost:18081/"}])')
+ assert service['Routed fixture']['status']=='reachable',service
+ assert service['Rule rejected']['status']=='failed',service
+ print('PASS: service GET probes follow active Mihomo rules',flush=True)
  if page.locator('.driver-popover-close-btn').count(): page.locator('.driver-popover-close-btn').click()
  page.evaluate("location.hash='/home'")
  page.get_by_text('网络拓扑',exact=True).wait_for()
@@ -64,7 +90,8 @@ with sync_playwright() as p:
  page.get_by_role('button',name='规则提供者',exact=True).click()
  page.get_by_text('LocalRules',exact=True).wait_for()
  page.locator('.page-tabs').get_by_role('button',name='规则',exact=False).first.click()
- page.get_by_role('button',name='规则设置',exact=True).click()
+ native_header_click(page,'规则设置')
+ assert page.get_by_role('button',name='规则设置',exact=True).evaluate("el=>getComputedStyle(el.closest('.header')).webkitAppRegion")=='no-drag'
  page.get_by_role('switch',name='禁用规则时打断连接',exact=True).press('Space')
  page.get_by_role('button',name=re.compile('规则样式')).click()
  page.get_by_role('option',name='表格',exact=True).click()
@@ -79,6 +106,10 @@ with sync_playwright() as p:
  stream=traffic();time.sleep(1)
  assert api('/connections')['connections']
  print('PASS: real rule table disable closes matching connections and re-enable restores routing',flush=True)
+ page.evaluate("location.hash='/logs'")
+ native_header_click(page,'日志设置')
+ page.locator('[data-slot="modal-close-trigger"]').click()
+ print('PASS: native OS clicks open rule and log settings outside Electron drag regions',flush=True)
  page.evaluate("location.hash='/connections'")
  page.get_by_role('button',name='关闭连接',exact=True).first.wait_for()
  assert page.get_by_role('button',name='表格',exact=True).count()==0

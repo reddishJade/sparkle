@@ -2,14 +2,12 @@
 import { Button } from '@heroui/react'
 import { useEffect, useState } from 'react'
 import { FiPlay, FiSettings } from 'react-icons/fi'
-import { streamingTargets } from '../../../../shared/network-targets'
-import { getNetworkLatencies } from '@renderer/utils/ipc'
+import type { ServiceProbeResult } from '../../../../shared/network-targets'
+import { getServiceReachability } from '@renderer/utils/ipc'
 import ProbeTargetsDialog from './probe-targets-dialog'
-import { readTargets } from './probe-preferences'
+import { readServiceTargets } from './probe-preferences'
 export default function ServiceReachability() {
-  const [targets, setTargets] = useState(() =>
-    readTargets('home-service-targets', streamingTargets)
-  )
+  const [targets, setTargets] = useState(readServiceTargets)
   const [selected, setSelected] = useState<string[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('home-service-selected') ?? 'null')
@@ -28,7 +26,7 @@ export default function ServiceReachability() {
       ? ['YouTube', 'Netflix', 'OpenAI', 'Gemini']
       : targets.slice(0, 4).map((target) => target.name)
   })
-  const [results, setResults] = useState<Record<string, number | null>>({})
+  const [results, setResults] = useState<Record<string, ServiceProbeResult>>({})
   const [testing, setTesting] = useState(false)
   const [editing, setEditing] = useState(false)
   useEffect(() => {
@@ -39,9 +37,13 @@ export default function ServiceReachability() {
     setResults({})
     const visibleTargets = targets.filter((target) => selected.includes(target.name))
     try {
-      setResults(await getNetworkLatencies(visibleTargets))
+      setResults(await getServiceReachability(visibleTargets))
     } catch {
-      setResults(Object.fromEntries(visibleTargets.map((target) => [target.name, null])))
+      setResults(
+        Object.fromEntries(
+          visibleTargets.map((target) => [target.name, { status: 'failed', latency: null }])
+        )
+      )
     } finally {
       setTesting(false)
     }
@@ -79,10 +81,10 @@ export default function ServiceReachability() {
             <span className="truncate">{name}</span>
             <span
               className={
-                results[name] === null
-                  ? 'text-danger'
-                  : results[name] > 0
-                    ? 'text-success'
+                results[name]?.status === 'reachable'
+                  ? 'text-success'
+                  : results[name]
+                    ? 'text-warning'
                     : 'text-foreground-500'
               }
             >
@@ -90,14 +92,17 @@ export default function ServiceReachability() {
                 ? testing
                   ? '检测中…'
                   : '未检测'
-                : results[name] === null
-                  ? '不可达'
-                  : `${results[name]} ms`}
+                : {
+                    reachable: '可达',
+                    restricted: '受限',
+                    challenge: '验证拦截',
+                    failed: '不可达'
+                  }[results[name].status]}
             </span>
           </div>
         ))}
       </div>
-      <p className="text-xs text-foreground-500 mt-2">按当前规则检测</p>
+      <p className="text-xs text-foreground-500 mt-2">按当前规则检测 · {targets.length} 个项目</p>
       {editing && (
         <ProbeTargetsDialog
           title="流媒体 / AI 检测项目"

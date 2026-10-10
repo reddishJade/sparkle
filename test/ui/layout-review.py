@@ -19,6 +19,8 @@ with sync_playwright() as p:
             page.wait_for_timeout(700)
             page.locator('.content').evaluate('(el) => el.scrollTop = 0')
             assert page.locator('.topology-viewport').bounding_box()['height'] <= 232
+            assert page.locator('.topology-viewport').evaluate('(el) => el.scrollHeight <= el.clientHeight + 2')
+            assert page.locator('.home-traffic-trend').evaluate('(el) => el.scrollHeight <= el.clientHeight + 2')
             sizes = page.locator('.home-bottom > .home-unit').evaluate_all('(cards) => cards.map(card => ({width:card.offsetWidth,height:card.offsetHeight}))')
             assert len(sizes) == 4 and all(size == sizes[0] for size in sizes)
             assert sizes[0]['height'] <= 208, sizes

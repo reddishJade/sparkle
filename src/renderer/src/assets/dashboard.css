@@ -182,7 +182,7 @@
 }
 .home-monitor-item {
   min-width: 0;
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
 }
@@ -215,17 +215,12 @@
 }
 .home-monitor .history-chart {
   margin-top: 10px;
-  flex: 1;
-  min-height: 36px;
-  display: flex;
-  align-items: flex-end;
 }
 .home-monitor .history-chart > .flex {
   display: none;
 }
 .home-monitor .history-chart svg {
-  height: 100%;
-  max-height: 110px;
+  height: 28px;
   margin: 0;
 }
 .home-secondary {
@@ -735,11 +730,31 @@
 }
 .home-content {
   height: 100%;
-  min-height: 680px;
+  min-height: 780px;
 }
 .home-content .home-monitor {
+  flex: 0 0 auto;
+}
+.home-traffic-trend {
   flex: 1;
-  min-height: 180px;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+}
+.home-traffic-trend .history-chart {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.home-traffic-trend .history-chart svg {
+  flex: 1;
+  min-height: 32px;
+  height: 0;
+  margin: 8px 0;
+}
+.home-content .topology-panel:not(.topology-large) .topology-viewport {
+  max-height: 174px;
 }
 .home-content > .home-status,
 .home-content > .topology-panel {

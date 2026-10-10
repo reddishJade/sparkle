@@ -2,11 +2,13 @@ import {
   latencyTargets,
   validateNetworkTargets,
   type NetworkIPInfo,
-  type NetworkTarget
+  type NetworkTarget,
+  type ServiceProbeResult
 } from '../../shared/network-targets'
 import axios, { type AxiosInstance } from 'axios'
 import { mihomoConfig } from './mihomoApi'
 import { performance } from 'node:perf_hooks'
+import { classifyServiceResponse } from './service-probe-response'
 // Every probe enters the running core's HTTP listener and follows its active rules/mode.
 async function getProbeClient(): Promise<AxiosInstance> {
   const config = await mihomoConfig()
@@ -67,6 +69,44 @@ export async function getNetworkLatencies(
           return [name, Math.round(performance.now() - start)]
         } catch {
           return [name, null]
+        }
+      })
+    )
+  )
+}
+export async function getServiceReachability(
+  input: NetworkTarget[]
+): Promise<Record<string, ServiceProbeResult>> {
+  const targets = validateNetworkTargets(input)
+  const client = await getProbeClient()
+  return Object.fromEntries(
+    await Promise.all(
+      targets.map(async ({ name, url }): Promise<[string, ServiceProbeResult]> => {
+        const start = performance.now()
+        try {
+          const response = await client.get<string>(url, {
+            responseType: 'text',
+            maxContentLength: 4 * 1024 * 1024,
+            validateStatus: () => true,
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+              'Accept-Language': 'en-US,en;q=0.9'
+            }
+          })
+          return [
+            name,
+            {
+              status: classifyServiceResponse(
+                response.status,
+                response.data,
+                response.headers['cf-mitigated']
+              ),
+              latency: Math.round(performance.now() - start)
+            }
+          ]
+        } catch {
+          return [name, { status: 'failed', latency: null }]
         }
       })
     )

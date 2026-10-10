@@ -88,6 +88,15 @@ export default function Home() {
             </section>
           ))}
         </div>
+        <section className="dashboard-panel home-traffic-trend">
+          <h2>实时流量</h2>
+          <HistoryChart
+            timestamps={live.history.map((s) => s.time)}
+            series={[live.history.map((s) => s.down), live.history.map((s) => s.up)]}
+            labels={['下载', '上传']}
+            format={(value) => `${bytes(value)}/s`}
+          />
+        </section>
         <NetworkTopology connections={connections} />
         <div className="home-bottom">
           <section className="dashboard-panel home-unit">

@@ -21,6 +21,7 @@ export default function ProbeTargetsDialog({
     targets.flatMap((target, index) => (selected?.includes(target.name) ? [index] : []))
   )
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
   function save(): void {
     try {
       const normalized = validateNetworkTargets(draft)
@@ -51,69 +52,85 @@ export default function ProbeTargetsDialog({
             </Modal.Header>
             <Modal.Body>
               {selected && (
-                <p className="text-sm text-foreground-500 mb-3">首页展示 {checked.length} / 4 项</p>
+                <p className="text-sm text-foreground-500 mb-3">
+                  {draft.length} 个项目 · 首页展示 {checked.length} / 4 项
+                </p>
               )}
+              <Input
+                aria-label="搜索检测项目"
+                placeholder="搜索名称或网址"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="mb-3"
+              />
               <div className="probe-target-editor">
-                {draft.map((target, index) => (
-                  <div key={index} className="probe-target-row">
-                    {selected && (
-                      <Checkbox
-                        aria-label={`展示 ${target.name || index + 1}`}
-                        isSelected={checked.includes(index)}
-                        isDisabled={!checked.includes(index) && checked.length === 4}
-                        onChange={(value) =>
-                          setChecked(
-                            value ? [...checked, index] : checked.filter((item) => item !== index)
+                {draft
+                  .map((target, index) => ({ target, index }))
+                  .filter(({ target }) =>
+                    `${target.name} ${target.url}`
+                      .toLowerCase()
+                      .includes(search.trim().toLowerCase())
+                  )
+                  .map(({ target, index }) => (
+                    <div key={index} className="probe-target-row">
+                      {selected && (
+                        <Checkbox
+                          aria-label={`展示 ${target.name || index + 1}`}
+                          isSelected={checked.includes(index)}
+                          isDisabled={!checked.includes(index) && checked.length === 4}
+                          onChange={(value) =>
+                            setChecked(
+                              value ? [...checked, index] : checked.filter((item) => item !== index)
+                            )
+                          }
+                        >
+                          <Checkbox.Content>
+                            <Checkbox.Control>
+                              <Checkbox.Indicator />
+                            </Checkbox.Control>
+                          </Checkbox.Content>
+                        </Checkbox>
+                      )}
+                      <Input
+                        aria-label={`测试名称 ${index + 1}`}
+                        value={target.name}
+                        placeholder="名称"
+                        onChange={(event) =>
+                          setDraft(
+                            draft.map((item, i) =>
+                              i === index ? { ...item, name: event.target.value } : item
+                            )
                           )
                         }
+                      />
+                      <Input
+                        aria-label={`测试网址 ${index + 1}`}
+                        value={target.url}
+                        placeholder="https://"
+                        onChange={(event) =>
+                          setDraft(
+                            draft.map((item, i) =>
+                              i === index ? { ...item, url: event.target.value } : item
+                            )
+                          )
+                        }
+                      />
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`删除测试项目 ${index + 1}`}
+                        onPress={() => {
+                          setDraft(draft.filter((_, i) => i !== index))
+                          setChecked(
+                            checked.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))
+                          )
+                        }}
                       >
-                        <Checkbox.Content>
-                          <Checkbox.Control>
-                            <Checkbox.Indicator />
-                          </Checkbox.Control>
-                        </Checkbox.Content>
-                      </Checkbox>
-                    )}
-                    <Input
-                      aria-label={`测试名称 ${index + 1}`}
-                      value={target.name}
-                      placeholder="名称"
-                      onChange={(event) =>
-                        setDraft(
-                          draft.map((item, i) =>
-                            i === index ? { ...item, name: event.target.value } : item
-                          )
-                        )
-                      }
-                    />
-                    <Input
-                      aria-label={`测试网址 ${index + 1}`}
-                      value={target.url}
-                      placeholder="https://"
-                      onChange={(event) =>
-                        setDraft(
-                          draft.map((item, i) =>
-                            i === index ? { ...item, url: event.target.value } : item
-                          )
-                        )
-                      }
-                    />
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`删除测试项目 ${index + 1}`}
-                      onPress={() => {
-                        setDraft(draft.filter((_, i) => i !== index))
-                        setChecked(
-                          checked.filter((i) => i !== index).map((i) => (i > index ? i - 1 : i))
-                        )
-                      }}
-                    >
-                      <FiTrash2 />
-                    </Button>
-                  </div>
-                ))}
+                        <FiTrash2 />
+                      </Button>
+                    </div>
+                  ))}
               </div>
               <Button
                 size="sm"

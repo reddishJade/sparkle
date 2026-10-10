@@ -29,6 +29,10 @@ with sync_playwright() as p:
     page.get_by_text('自定义站点',exact=True).wait_for()
     assert page.evaluate("JSON.parse(localStorage.getItem('home-latency-targets'))[0].url") == 'https://example.com/generate_204'
     page.get_by_role('button',name='选择流媒体 AI 检测项目',exact=True).click()
+    assert page.locator('.probe-target-row').count() >= 30
+    page.get_by_label('搜索检测项目',exact=True).fill('Claude')
+    assert page.locator('.probe-target-row').count() == 1
+    page.get_by_label('搜索检测项目',exact=True).fill('')
     page.get_by_role('checkbox',name='展示 Netflix',exact=True).press('Space')
     page.get_by_role('checkbox',name='展示 Disney+',exact=True).press('Space')
     page.get_by_role('button',name='保存',exact=True).click()
@@ -36,7 +40,7 @@ with sync_playwright() as p:
     page.get_by_role('button',name='开始流媒体 AI 检测',exact=True).wait_for(state='visible')
     page.wait_for_timeout(200)
     assert page.evaluate("JSON.parse(localStorage.getItem('home-service-selected'))") == ['YouTube','OpenAI','Gemini','Disney+']
-    urls = [target['url'] for call in page.evaluate('window.__calls') if call[0] == 'getNetworkLatencies' for target in (call[1] or [])]
+    urls = [target['url'] for call in page.evaluate('window.__calls') if call[0] == 'getServiceReachability' for target in (call[1] or [])]
     assert 'https://www.disneyplus.com/' in urls and not any('netflix.com' in url for url in urls)
     assert page.get_by_role('button', name=re.compile('检测节点或分组')).count() == 0
     assert not any(call[0] == 'mihomoProxyDelay' for call in page.evaluate('window.__calls'))
