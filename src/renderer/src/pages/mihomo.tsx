@@ -10,9 +10,12 @@ import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-c
 import PortSetting from '@renderer/components/mihomo/port-setting'
 import { platform } from '@renderer/utils/init'
 import { IoMdCloudDownload } from 'react-icons/io'
+import { CgTrash } from 'react-icons/cg'
 import PubSub from 'pubsub-js'
 import {
   manualGrantCorePermition,
+  mihomoFlushDns,
+  mihomoFlushFakeIp,
   mihomoUpgrade,
   restartCore,
   revokeCorePermission,
@@ -68,6 +71,7 @@ const Mihomo: React.FC = () => {
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
   const { ipv6 } = controledMihomoConfig || {}
 
+  const [clearingCache, setClearingCache] = useState<'dns' | 'fake-ip' | null>(null)
   const [upgrading, setUpgrading] = useState(false)
   const [showPermissionModal, setShowPermissionModal] = useState(false)
   const [showServiceModal, setShowServiceModal] = useState(false)
@@ -95,6 +99,23 @@ const Mihomo: React.FC = () => {
       PubSub.publish('mihomo-core-changed')
     } catch (e) {
       notify(e, { variant: 'danger' })
+    }
+  }
+
+  const handleClearCache = async (type: 'dns' | 'fake-ip'): Promise<void> => {
+    if (clearingCache) return
+    setClearingCache(type)
+    try {
+      if (type === 'dns') {
+        await mihomoFlushDns()
+      } else {
+        await mihomoFlushFakeIp()
+      }
+      notify(type === 'dns' ? 'DNS 缓存已清空' : 'Fake IP 映射已清空')
+    } catch (e) {
+      notify(e, { variant: 'danger' })
+    } finally {
+      setClearingCache(null)
     }
   }
 
@@ -424,7 +445,7 @@ const Mihomo: React.FC = () => {
             管理
           </Button>
         </SettingItem>
-        <SettingItem compatKey="legacy" title="IPv6">
+        <SettingItem compatKey="legacy" title="IPv6" divider>
           <Switch
             size="sm"
             isSelected={ipv6}
@@ -437,6 +458,32 @@ const Mihomo: React.FC = () => {
               </Switch.Control>
             </Switch.Content>
           </Switch>
+        </SettingItem>
+        <SettingItem compatKey="legacy" title="清空 DNS 缓存" divider>
+          <Button
+            size="sm"
+            isIconOnly
+            variant="ghost"
+            data-color="danger"
+            aria-label="清空 DNS 缓存"
+            isDisabled={clearingCache !== null}
+            onPress={() => handleClearCache('dns')}
+          >
+            <CgTrash className="text-lg" />
+          </Button>
+        </SettingItem>
+        <SettingItem compatKey="legacy" title="清空 Fake IP">
+          <Button
+            size="sm"
+            isIconOnly
+            variant="ghost"
+            data-color="danger"
+            aria-label="清空 Fake IP"
+            isDisabled={clearingCache !== null}
+            onPress={() => handleClearCache('fake-ip')}
+          >
+            <CgTrash className="text-lg" />
+          </Button>
         </SettingItem>
       </SettingCard>
       <PortSetting />

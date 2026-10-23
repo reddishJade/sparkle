@@ -1,6 +1,8 @@
 import { app, ipcMain } from 'electron'
 import {
   mihomoChangeProxy,
+  mihomoFlushDns,
+  mihomoFlushFakeIp,
   mihomoCloseConnections,
   mihomoCloseConnection,
   mihomoGroupDelay,
@@ -218,6 +220,8 @@ async function normalizeServiceModePatch(patch: Partial<AppConfig>): Promise<Par
 export function registerIpcMainHandlers(): void {
   ipcMain.handle('mihomoVersion', ipcErrorWrapper(mihomoVersion))
   ipcMain.handle('mihomoConfig', ipcErrorWrapper(mihomoConfig))
+  ipcMain.handle('mihomoFlushDns', ipcErrorWrapper(mihomoFlushDns))
+  ipcMain.handle('mihomoFlushFakeIp', ipcErrorWrapper(mihomoFlushFakeIp))
   ipcMain.handle('mihomoCloseConnection', (_e, id) => ipcErrorWrapper(mihomoCloseConnection)(id))
   ipcMain.handle('mihomoCloseConnections', (_e, name) =>
     ipcErrorWrapper(mihomoCloseConnections)(name)
