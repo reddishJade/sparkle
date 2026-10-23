@@ -18,6 +18,7 @@ export interface TrafficConnectionItem {
   group: string
   chains?: string[]
   rule?: string
+  rulePayload?: string
   upload: number
   download: number
   total: number
@@ -39,6 +40,7 @@ export interface DayTrafficStats {
   connections?: Record<string, TrafficConnectionItem>
   processes?: Record<string, { upload: number; download: number }>
   hosts?: Record<string, { upload: number; download: number }>
+  rules?: Record<string, { upload: number; download: number }>
 }
 
 export interface CheckpointConnection {
@@ -70,7 +72,7 @@ export interface TrafficSummaryItem {
 }
 
 export type TrafficTimeRange = 'session' | 'today' | '7d' | '30d' | 'all'
-export type TrafficDimension = 'nodes' | 'groups' | 'connections' | 'processes' | 'hosts'
+export type TrafficDimension = 'nodes' | 'groups' | 'rules' | 'hosts' | 'processes' | 'connections'
 
 export interface TrafficStatsSummary {
   range: TrafficTimeRange
@@ -82,6 +84,7 @@ export interface TrafficStatsSummary {
   unknownTotal: number
   nodes: TrafficSummaryItem[]
   groups: TrafficSummaryItem[]
+  rules: TrafficSummaryItem[]
   connections: TrafficConnectionItem[]
   processes: TrafficSummaryItem[]
   hosts: TrafficSummaryItem[]
