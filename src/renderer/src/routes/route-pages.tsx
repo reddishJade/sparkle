@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { onInitialContentReady } from '@renderer/utils/startup'
+import { supportsGateway } from '@renderer/utils/init'
 import { createPreloadablePage } from './preloadable-page'
 
 const OverridePage = createPreloadablePage(() => import('@renderer/pages/override'))
@@ -11,6 +12,7 @@ const LogsPage = createPreloadablePage(() => import('@renderer/pages/logs'))
 const ConnectionsPage = createPreloadablePage(() => import('@renderer/pages/connections'))
 const TrafficPage = createPreloadablePage(() => import('@renderer/pages/traffic'))
 const MihomoPage = createPreloadablePage(() => import('@renderer/pages/mihomo'))
+const GatewayPage = createPreloadablePage(() => import('@renderer/pages/gateway'))
 const SysproxyPage = createPreloadablePage(() => import('@renderer/pages/syspeoxy'))
 const TunPage = createPreloadablePage(() => import('@renderer/pages/tun'))
 const ResourcesPage = createPreloadablePage(() => import('@renderer/pages/resources'))
@@ -26,6 +28,7 @@ export const Logs = LogsPage.Page
 export const Connections = ConnectionsPage.Page
 export const Traffic = TrafficPage.Page
 export const Mihomo = MihomoPage.Page
+export const Gateway = GatewayPage.Page
 export const Sysproxy = SysproxyPage.Page
 export const Tun = TunPage.Page
 export const Resources = ResourcesPage.Page
@@ -41,6 +44,7 @@ const remainingPageLoaders: Array<() => Promise<unknown>> = [
   TrafficPage.preload,
   RulesPage.preload,
   MihomoPage.preload,
+  ...(supportsGateway ? [GatewayPage.preload] : []),
   SysproxyPage.preload,
   TunPage.preload,
   DNSPage.preload,

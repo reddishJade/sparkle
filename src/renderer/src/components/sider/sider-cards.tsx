@@ -15,6 +15,8 @@ import ConnCard from './conn-card'
 import DNSCard from './dns-card'
 import LogCard from './log-card'
 import MihomoCoreCard from './mihomo-core-card'
+import GatewayCard from './gateway-card'
+import { supportsGateway } from '@renderer/utils/init'
 import OverrideCard from './override-card'
 import ProfileCard from './profile-card'
 import ProxyCard from './proxy-card'
@@ -63,6 +65,7 @@ const siderCardRouteMap = {
   'profile-card': '/profiles',
   'proxy-card': '/proxies',
   'mihomo-core-card': '/mihomo',
+  'gateway-card': '/gateway',
   'conn-card': '/connections',
   'traffic-card': '/traffic',
   'dns-card': '/dns',
@@ -83,6 +86,7 @@ const componentMap = {
   profile: ProfileCard,
   proxy: ProxyCard,
   mihomo: MihomoCoreCard,
+  gateway: GatewayCard,
   connection: ConnCard,
   traffic: TrafficCard,
   dns: DNSCard,
@@ -95,14 +99,23 @@ const componentMap = {
 
 interface Props {
   iconOnly?: boolean
+  expanded?: boolean
 }
 
-export default function SiderCards({ iconOnly = false }: Props): React.JSX.Element {
+export default function SiderCards({
+  iconOnly = false,
+  expanded = false
+}: Props): React.JSX.Element {
   const { appConfig, patchAppConfig } = useAppConfig()
   const siderOrder = useMemo(() => {
-    const raw = (appConfig?.siderOrder ?? defaultSiderOrder).filter((id) => id in componentMap)
-    const missing = defaultSiderOrder.filter((id) => !raw.includes(id))
-    return missing.length > 0 ? [...raw, ...missing] : raw
+    const saved = (appConfig?.siderOrder ?? defaultSiderOrder).filter(
+      (id) => id in componentMap
+    )
+    const missing = defaultSiderOrder.filter((id) => !saved.includes(id))
+    const merged = missing.length > 0 ? [...saved, ...missing] : saved
+    return supportsGateway && !merged.includes('gateway')
+      ? [...merged, 'gateway']
+      : merged.filter((key) => key !== 'gateway' || supportsGateway)
   }, [appConfig?.siderOrder])
   const [order, setOrder] = useState(siderOrder)
   const gridRef = useRef<HTMLDivElement>(null)
@@ -172,7 +185,7 @@ export default function SiderCards({ iconOnly = false }: Props): React.JSX.Eleme
   const cards = order.map((key: string) => {
     const Component = componentMap[key]
     if (!Component) return null
-    return <Component key={key} iconOnly={iconOnly} />
+    return <Component key={key} iconOnly={iconOnly} expanded={expanded} />
   })
 
   if (iconOnly) {

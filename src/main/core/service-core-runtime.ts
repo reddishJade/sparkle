@@ -28,6 +28,7 @@ import { shouldSkipServiceUnavailableFallback } from '../service/fallback'
 import { appendAppLog, setMihomoLogSource } from '../utils/log'
 import { showNotification } from '../utils/notification'
 import { trafficStatsService } from '../traffic/traffic-stats-service'
+import { emitWebhook, notifyCoreStarted, notifyCoreStopped } from '../resolve/webhook'
 
 interface ServiceCoreRuntimeOptions {
   notifyCoreLog: (source: ServiceCoreEvent) => void
@@ -238,6 +239,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
 
     switch (event.type) {
       case 'started':
+        if (event.running) notifyCoreStarted('service', event.pid)
         serviceCoreState.autoResumePaused = false
         serviceCoreState.managed = true
         trafficStatsService.setCoreInstanceId(`service_${event.pid || 'core'}_${event.time || Date.now()}`)
@@ -252,6 +254,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
         break
       case 'takeover':
       case 'ready':
+        if (event.running) notifyCoreStarted('service', event.pid)
         serviceCoreState.autoResumePaused = false
         serviceCoreState.managed = true
         trafficStatsService.setCoreInstanceId(`service_${event.pid || 'core'}_${event.time || Date.now()}`)
@@ -266,6 +269,16 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
       case 'failed':
       case 'restart_failed':
         trafficStatsService.setCoreInstanceId(undefined)
+        if (event.type === 'exited') {
+          notifyCoreStopped('service', event.old_pid ?? event.pid, 'exited')
+        } else {
+          emitWebhook(
+            'lifecycle',
+            'core.failed',
+            { mode: 'service', reason: event.type },
+            'failure'
+          )
+        }
         clearStreams()
         setMihomoLogSource('out')
         mainWindow?.webContents.send('core-stopped', event)
@@ -278,6 +291,7 @@ export function createServiceCoreRuntime(options: ServiceCoreRuntimeOptions) {
         break
       case 'stopped':
         trafficStatsService.setCoreInstanceId(undefined)
+        notifyCoreStopped('service', event.old_pid ?? event.pid)
         serviceCoreState.autoResumePaused = true
         serviceCoreState.managed = false
         serviceCoreState.streamsActive = false
